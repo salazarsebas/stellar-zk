@@ -1,0 +1,30 @@
+[package]
+name = "stellar-zk-groth16"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Groth16 backend for stellar-zk (Circom + snarkjs)"
+
+[dependencies]
+stellar-zk-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+which = "7.0"
+
+# BigInt parsing for snarkjs JSON output (decimal coordinate strings → bytes)
+num-bigint = { version = "0.4", features = ["serde"] }
+num-traits = "0.2"
+
+# Utilities
+hex = "0.4"
+
+# Arkworks (for serializer tests — verifying against known curve points)
+[dev-dependencies]
+ark-bn254 = { version = "0.5", default-features = false }
+ark-ec = { version = "0.5", default-features = false }
+ark-ff = { version = "0.5", default-features = false }

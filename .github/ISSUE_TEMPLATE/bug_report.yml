@@ -1,0 +1,96 @@
+name: Bug Report
+description: Report a bug in stellar-zk
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this behavior?
+      placeholder: |
+        1. Run `stellar-zk init myapp --backend groth16`
+        2. Run `stellar-zk build`
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include error messages or logs if available.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      description: Which ZK backend were you using?
+      options:
+        - groth16
+        - ultrahonk
+        - risc0
+        - N/A
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux (Ubuntu/Debian)
+        - Linux (Other)
+        - Windows (WSL)
+    validations:
+      required: true
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust version
+      description: Output of `rustc --version`
+      placeholder: "rustc 1.84.0 (9fc6b4312 2025-01-07)"
+
+  - type: textarea
+    id: tool-versions
+    attributes:
+      label: External tool versions (if applicable)
+      description: |
+        Versions of backend-specific tools, if relevant to the bug.
+      placeholder: |
+        circom: 2.1.9
+        snarkjs: 0.7.5
+        node: v20.11.0
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Run the failing command with `-vvv` and paste the output here.
+      render: shell

@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/stellar-zk-cli",
+    "crates/stellar-zk-core",
+    "crates/stellar-zk-groth16",
+    "crates/stellar-zk-ultrahonk",
+    "crates/stellar-zk-risc0",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.84.0"
+repository = "https://github.com/stellar-zk/stellar-zk"
+homepage = "https://github.com/stellar-zk/stellar-zk"
+keywords = ["stellar", "soroban", "zk", "groth16", "zero-knowledge"]
+categories = ["cryptography", "command-line-utilities"]
+authors = ["stellar-zk contributors"]
+
+[workspace.dependencies]
+# Shared across workspace
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+
+# Internal crates
+stellar-zk-core = { path = "crates/stellar-zk-core" }
+stellar-zk-groth16 = { path = "crates/stellar-zk-groth16" }
+stellar-zk-ultrahonk = { path = "crates/stellar-zk-ultrahonk" }
+stellar-zk-risc0 = { path = "crates/stellar-zk-risc0" }

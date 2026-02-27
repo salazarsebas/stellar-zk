@@ -1,0 +1,18 @@
+[package]
+name = "stellar-zk-ultrahonk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Noir + UltraHonk backend for stellar-zk (nargo + Barretenberg)"
+
+[dependencies]
+stellar-zk-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+which = "7.0"
+hex = "0.4"

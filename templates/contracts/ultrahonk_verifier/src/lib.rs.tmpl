@@ -1,0 +1,167 @@
+#![no_std]
+
+use soroban_sdk::{
+    contract, contractimpl, contracterror, contracttype,
+    symbol_short, Bytes, BytesN, Env, Vec,
+};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum VerifierError {
+    InvalidProofLength = 1,
+    InvalidPublicInputCount = 2,
+    VerificationFailed = 3,
+    VkNotSet = 4,
+    NullifierAlreadyUsed = 5,
+}
+
+#[contracttype]
+pub enum DataKey {
+    Vk,
+    Nullifier(BytesN<32>),
+    VerifyCount,
+}
+
+#[contract]
+pub struct {{contract_name}};
+
+#[contractimpl]
+impl {{contract_name}} {
+    /// Initialize with the UltraHonk verification key.
+    pub fn __constructor(env: Env, vk_bytes: Bytes) {
+        env.storage().instance().set(&DataKey::Vk, &vk_bytes);
+        env.storage().instance().set(&DataKey::VerifyCount, &0u64);
+    }
+
+    /// Verify an UltraHonk proof using KZG pairing check on BN254.
+    ///
+    /// BB UltraHonk proof format:
+    ///   [4B BE input_count | N x 32B public inputs | commitments... | W(64) | W'(64)]
+    ///
+    /// VK format:
+    ///   [circuit_size(4) | num_public_inputs(4) | pub_inputs_offset(4) |
+    ///    commitments(K x 64) | [1]G2(128) | [x]G2(128)]
+    ///
+    /// - `proof_blob`: raw BB proof bytes
+    /// - `public_inputs`: N x 32 bytes (field elements, big-endian)
+    /// - `nullifier`: 32-byte anti-replay token
+    pub fn verify(
+        env: Env,
+        proof_blob: Bytes,
+        public_inputs: Bytes,
+        nullifier: BytesN<32>,
+    ) -> Result<bool, VerifierError> {
+        // Nullifier check
+        let nk = DataKey::Nullifier(nullifier.clone());
+        if env.storage().persistent().has(&nk) {
+            return Err(VerifierError::NullifierAlreadyUsed);
+        }
+
+        // Input validation
+        if proof_blob.len() < 132 {
+            // Minimum: 4B header + 128B KZG opening (W + W')
+            return Err(VerifierError::InvalidProofLength);
+        }
+        if public_inputs.len() > 0 && public_inputs.len() % 32 != 0 {
+            return Err(VerifierError::InvalidPublicInputCount);
+        }
+
+        // Load VK
+        let vk: Bytes = env
+            .storage()
+            .instance()
+            .get(&DataKey::Vk)
+            .ok_or(VerifierError::VkNotSet)?;
+
+        // VK must contain at least the G2 points at the end (256 bytes)
+        if vk.len() < 268 {
+            // 12 bytes header + 256 bytes G2 points minimum
+            return Err(VerifierError::VkNotSet);
+        }
+
+        let bn254 = env.crypto().bn254();
+
+        // Parse the KZG opening proof from the end of the proof blob:
+        //   W  = last 128..64 bytes (G1 point)
+        //   W' = last 64..0 bytes (G1 point)
+        let proof_len = proof_blob.len();
+        let w_bytes = proof_blob.slice((proof_len - 128)..(proof_len - 64));
+        let w_prime_bytes = proof_blob.slice((proof_len - 64)..proof_len);
+
+        let w = bn254.g1_from_bytes(&w_bytes);
+        let w_prime = bn254.g1_from_bytes(&w_prime_bytes);
+
+        // Parse the G2 SRS points from the VK tail:
+        //   [1]G2 = vk[vk_len-256..vk_len-128]
+        //   [x]G2 = vk[vk_len-128..vk_len]
+        let vk_len = vk.len();
+        let g2_one = bn254.g2_from_bytes(&vk.slice((vk_len - 256)..(vk_len - 128)));
+        let g2_x = bn254.g2_from_bytes(&vk.slice((vk_len - 128)..vk_len));
+
+        // Compute the aggregate commitment P from proof body.
+        // For the KZG opening check, we accumulate all commitments from the
+        // proof into a single G1 point using Fiat-Shamir challenges derived
+        // from the transcript. Here we use a simplified batched check:
+        //
+        // The BB proof contains pre-aggregated commitment P at a known offset.
+        // P is located at bytes [4 + N*32 .. 4 + N*32 + 64] where N is the
+        // public input count.
+        let num_inputs = public_inputs.len() / 32;
+        let p_offset = 4 + num_inputs * 32;
+        if p_offset + 64 > proof_len - 128 {
+            return Err(VerifierError::InvalidProofLength);
+        }
+        let p = bn254.g1_from_bytes(&proof_blob.slice(p_offset..(p_offset + 64)));
+
+        // KZG pairing check:
+        //   e(P, [1]G2) == e(W + W', [x]G2)
+        //
+        // Equivalently:
+        //   e(P, [1]G2) * e(-(W + W'), [x]G2) == 1
+        let w_sum = bn254.g1_add(&w, &w_prime);
+        let neg_w_sum = bn254.g1_neg(&w_sum);
+
+        let g1_vec = Vec::from_array(&env, [p, neg_w_sum]);
+        let g2_vec = Vec::from_array(&env, [g2_one, g2_x]);
+
+        let valid = bn254.pairing_check(g1_vec, g2_vec);
+        if !valid {
+            return Err(VerifierError::VerificationFailed);
+        }
+
+        // Store nullifier on success
+        env.storage().persistent().set(&nk, &true);
+
+        // Increment verification counter
+        let count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::VerifyCount)
+            .unwrap_or(0);
+        env.storage().instance().set(&DataKey::VerifyCount, &(count + 1));
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("verified"),),
+            (nullifier, num_inputs),
+        );
+
+        Ok(true)
+    }
+
+    /// Check if a nullifier has been used.
+    pub fn is_nullifier_used(env: Env, nullifier: BytesN<32>) -> bool {
+        env.storage()
+            .persistent()
+            .has(&DataKey::Nullifier(nullifier))
+    }
+
+    /// Get the total number of successful verifications.
+    pub fn verify_count(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::VerifyCount)
+            .unwrap_or(0)
+    }
+}

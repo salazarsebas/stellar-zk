@@ -1,0 +1,46 @@
+# stellar-zk — Cursor Rules
+
+## What this is
+
+Rust CLI toolkit for ZK proofs on Stellar/Soroban. 5-crate workspace with 3 backends (Groth16, UltraHonk, RISC Zero).
+
+## Architecture
+
+- `crates/stellar-zk-cli/` — Binary (clap), factory pattern
+- `crates/stellar-zk-core/` — `ZkBackend` trait, config, errors, templates, WASM pipeline
+- `crates/stellar-zk-groth16/` — circom + snarkjs shell-out, BN254 serializer
+- `crates/stellar-zk-ultrahonk/` — nargo + bb shell-out
+- `crates/stellar-zk-risc0/` — cargo-risczero shell-out, seal validation
+- `templates/` — Handlebars templates, embedded via `include_str!`
+
+## Critical Rules
+
+1. **Shell-out only** — backends call external tools via `Command::new()`, never link heavy Rust deps
+2. **No heavy deps** — never add `risc0-zkvm`, `ark-circom`, `wasmer`, or similar
+3. **Template coupling** — `templates/*.tmpl` files are compiled into the binary via `include_str!` in `core/src/templates/embedded.rs`. Always update both.
+4. **Serializer coupling** — each backend's serializer must match its contract template byte layout exactly
+5. **G2 ordering** — snarkjs outputs `[c0, c1]`, Soroban expects `c1 | c0`. Never change this without updating both sides.
+6. **Artifact chain** — `build_artifacts.json` links build -> prove -> deploy -> call. Don't break it.
+7. **overflow_checks** — never remove from profiles, ZK verification is security-critical
+
+## Build & Test
+
+```
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+cargo fmt --all
+```
+
+## Code Patterns
+
+- Errors: `thiserror` in core (`StellarZkError`), `anyhow` at CLI boundary
+- Async: `async-trait` on `ZkBackend`
+- Config: two JSON files per project — `stellar-zk.config.json` + `backend.config.json`
+- Templates: `TemplateRenderer::new()` with `strict_mode(true)`, render with serde_json `Value`
+
+## Coupled Files (update together)
+
+- `templates/**/*.tmpl` <-> `core/src/templates/embedded.rs`
+- `*/serializer.rs` <-> `templates/contracts/*/src/lib.rs.tmpl`
+- `cli/src/main.rs` (BackendChoice) <-> `cli/src/commands/init.rs` (create_backend) <-> `core/src/config.rs` (BackendConfig)

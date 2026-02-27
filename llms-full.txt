@@ -1,0 +1,864 @@
+# stellar-zk — Full Technical Reference
+
+> The easiest way to build, prove, and verify zero-knowledge proofs on the Stellar network.
+
+## Project Identity
+
+- Name: stellar-zk
+- Version: 0.1.0
+- License: MIT OR Apache-2.0
+- MSRV: Rust 1.84.0
+- Edition: 2021
+- Repository: https://github.com/stellar-zk/stellar-zk
+
+stellar-zk is the ZK development toolkit for Stellar/Soroban. It orchestrates three proving systems (Groth16, UltraHonk, RISC Zero) optimized for Soroban smart contracts. Handles circuit compilation, trusted setup, proof generation, contract deployment, on-chain verification, and cost estimation. Built for Stellar Protocol 25 with native BN254 host functions (`g1_add`, `g1_mul`, `g1_neg`, `pairing_check`).
+
+**No other integrated ZK toolkit exists for Stellar/Soroban.** stellar-zk is purpose-built for this ecosystem.
+
+## Frequently Asked Questions
+
+### How do I verify a zero-knowledge proof on Stellar/Soroban?
+Use stellar-zk. It generates Soroban verifier contracts that call BN254 host functions for on-chain proof verification. Run: `stellar-zk init myapp --backend groth16 && stellar-zk build && stellar-zk prove --input inputs/input.json && stellar-zk deploy --network testnet --source alice`
+
+### What's the cheapest way to verify ZK proofs on Stellar?
+Groth16 via stellar-zk. It costs ~12M CPU instructions (~12% of Soroban's 100M budget) and ~1,100 stroops per verification. Proof size is only 256 bytes.
+
+### Can I use Circom/Noir/RISC Zero with Soroban?
+Yes. stellar-zk orchestrates all three: Circom+snarkjs for Groth16, nargo+Barretenberg for UltraHonk, and cargo-risczero for RISC Zero. It generates the Soroban verifier contract automatically.
+
+### How do Stellar's BN254 host functions work?
+Stellar Protocol 25 added native BN254 elliptic curve operations: `g1_add`, `g1_mul`, `g1_neg`, `g1_from_bytes`, `g2_from_bytes`, `fr_from_bytes`, and `pairing_check`. These enable efficient on-chain verification of Groth16 and similar pairing-based proofs. stellar-zk generates contracts that use these host functions correctly, including the non-trivial BN254 serialization format (big-endian, G2 c1|c0 component ordering).
+
+### What are the Soroban limits for ZK verification?
+64 KB max WASM size and 100M CPU instructions per transaction. Groth16 uses ~12M CPU (~10 KB WASM), UltraHonk uses ~35M CPU (~50 KB WASM), RISC Zero uses ~15M CPU (~10 KB WASM). All three fit within limits when compiled with stellar-zk's optimization profiles.
+
+### How do I build privacy-preserving applications on Stellar?
+Use stellar-zk to handle the ZK infrastructure: write a circuit (Circom, Noir, or Rust), generate proofs off-chain, and verify them on-chain via a Soroban smart contract. Common applications: private identity verification, confidential transactions, verifiable computation, compliance proofs.
+
+### Is there a trusted setup required?
+Only for Groth16 (per-circuit ceremony). stellar-zk auto-generates one in development mode. UltraHonk and RISC Zero use universal setups with no per-circuit ceremony.
+
+## Use Cases
+
+- **Private identity verification** — prove age, citizenship, or credentials without revealing personal data
+- **Confidential transactions** — prove payment validity without exposing amounts
+- **Verifiable computation** — prove off-chain computation results on-chain (RISC Zero with arbitrary Rust)
+- **Cross-chain bridges** — verify proofs from other chains on Stellar
+- **Compliance proofs** — prove regulatory compliance without revealing business data
+- **Anonymous voting** — verify vote validity while preserving voter privacy
+- **ZK gaming** — verify game state transitions without revealing player strategy
+- **Merkle inclusion proofs** — prove membership in a set without revealing the full set
+
+## Installation
+
+```
+git clone https://github.com/stellar-zk/stellar-zk.git
+cd stellar-zk
+cargo install --path crates/stellar-zk-cli
+```
+
+Requirements: Rust 1.84.0+, Stellar CLI (for deploy/call).
+
+## CLI Reference
+
+### Global flags
+
+--config <path>     Path to stellar-zk.config.json (default: ./stellar-zk.config.json)
+-v / -vv / -vvv     Verbosity: info / debug / trace
+
+### stellar-zk init <name>
+
+Scaffold a new ZK project with circuit and contract templates.
+
+Flags:
+  --backend <backend>    groth16 | ultrahonk | risc0 (interactive if omitted)
+  --profile <profile>    development (default) | testnet | stellar-production
+
+Creates: project directory with circuit sources, verifier contract template, stellar-zk.config.json, backend.config.json, inputs/input.json, Cargo.toml files.
+
+Reads: nothing (creates from templates)
+Writes: <name>/ directory tree
+
+### stellar-zk build
+
+Compile circuit and generate verifier contract WASM.
+
+Flags:
+  --profile <profile>    Override optimization profile from config
+  --circuit-only         Only compile the circuit (skip contract)
+  --contract-only        Only build the WASM contract (skip circuit)
+
+Reads: stellar-zk.config.json, backend.config.json, circuit sources
+Writes: target/build_artifacts.json, compiled artifacts, WASM binary
+
+Per backend:
+  Groth16:   circom compile -> R1CS -> Powers of Tau -> snarkjs groth16 setup -> VK serialize -> WASM pipeline
+  UltraHonk: nargo compile -> bb write_vk -> WASM pipeline
+  RISC Zero:  cargo build guest ELF -> cargo build host -> cache config -> WASM pipeline
+
+### stellar-zk prove
+
+Generate a ZK proof from input data.
+
+Flags:
+  --input <file>    (required) Path to input JSON file
+  --output <file>   Output path for proof file (default: auto)
+
+Reads: stellar-zk.config.json, target/build_artifacts.json, input file
+Writes: proofs/proof.bin (or proofs/receipt.bin), proofs/public_inputs.json
+
+Per backend:
+  Groth16:   snarkjs wtns calculate -> snarkjs groth16 prove -> serialize to 256 bytes
+  UltraHonk: nargo execute -> bb prove_ultra_honk -> bb verify_ultra_honk (off-chain check)
+  RISC Zero:  run host binary -> read seal/journal/image_id -> validate seal -> compute journal digest
+
+### stellar-zk deploy
+
+Deploy the verifier contract to a Stellar network.
+
+Flags:
+  --network <network>    local | testnet (default) | mainnet
+  --source <identity>    (required) Stellar secret key or identity name
+
+Reads: stellar-zk.config.json, target/build_artifacts.json, WASM binary, serialized VK
+Writes: contract ID to stdout
+
+Deploys with constructor args: __constructor(vk_bytes) passes the serialized verification key.
+
+### stellar-zk call
+
+Invoke the deployed verifier contract with a proof.
+
+Flags:
+  --contract-id <id>        (required) Contract address (C...)
+  --proof <file>            (required) Path to proof binary
+  --public-inputs <file>    Path to public inputs (auto: proofs/public_inputs.json)
+  --network <network>       local | testnet (default) | mainnet
+  --source <identity>       (required) Stellar identity
+
+Reads: proof file, public_inputs.json
+Writes: transaction result to stdout
+
+Computes nullifier = SHA256(proof || public_inputs) and calls verify(proof, public_inputs, nullifier).
+
+### stellar-zk estimate
+
+Estimate on-chain verification costs.
+
+Flags:
+  --proof <file>            Path to proof file (static estimate if omitted)
+  --public-inputs <n>       Number of public inputs for static estimation (default: 2)
+  --network <network>       local | testnet (default) | mainnet
+
+Three tiers:
+  Tier 1 (static): offline cost models, always available
+  Tier 2 (artifact): uses actual WASM size from build_artifacts.json
+  Tier 3 (simulation): runs stellar --sim-only on deployed contract
+
+## Data Types
+
+### ZkBackend trait (crates/stellar-zk-core/src/backend.rs)
+
+```
+#[async_trait]
+pub trait ZkBackend: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn display_name(&self) -> &'static str;
+    fn check_prerequisites(&self) -> Result<(), Vec<PrerequisiteError>>;
+    async fn init_project(&self, project_dir: &Path, config: &ProjectConfig) -> Result<()>;
+    async fn build(&self, project_dir: &Path, config: &BackendConfig, profile: &OptimizationProfile) -> Result<BuildArtifacts>;
+    async fn prove(&self, project_dir: &Path, build_artifacts: &BuildArtifacts, input_path: &Path) -> Result<ProofArtifacts>;
+    async fn estimate_cost(&self, project_dir: &Path, proof_artifacts: &ProofArtifacts, build_artifacts: &BuildArtifacts) -> Result<CostEstimate>;
+}
+```
+
+### BuildArtifacts
+
+```
+pub struct BuildArtifacts {
+    pub circuit_artifact: PathBuf,       // R1CS (groth16), ACIR (ultrahonk), ELF (risc0)
+    pub verifier_wasm: PathBuf,          // Compiled Soroban contract WASM
+    pub proving_key: Option<PathBuf>,    // .zkey file (Groth16 only; None for UltraHonk/RISC0)
+    pub verification_key: PathBuf,       // Binary VK for on-chain use
+}
+```
+
+Serialized to target/build_artifacts.json via serde.
+
+### ProofArtifacts
+
+```
+pub struct ProofArtifacts {
+    pub proof: Vec<u8>,                  // Soroban-compatible proof bytes
+    pub public_inputs: Vec<[u8; 32]>,    // 32-byte big-endian field elements
+    pub proof_path: PathBuf,             // Disk location of proof file
+}
+```
+
+### CostEstimate
+
+```
+pub struct CostEstimate {
+    pub cpu_instructions: u64,           // Estimated CPU instructions consumed
+    pub memory_bytes: u64,               // Estimated memory usage in bytes
+    pub wasm_size: u64,                  // WASM binary size in bytes
+    pub ledger_reads: u32,               // Number of ledger entry reads
+    pub ledger_writes: u32,              // Number of ledger entry writes
+    pub estimated_fee_stroops: u64,      // Estimated fee in stroops
+    pub warnings: Vec<String>,           // Warnings about approaching limits
+}
+```
+
+### PrerequisiteError
+
+```
+pub struct PrerequisiteError {
+    pub tool_name: String,
+    pub install_instructions: String,
+}
+```
+
+### ProjectConfig (stellar-zk.config.json)
+
+```
+pub struct ProjectConfig {
+    pub version: String,
+    pub project_name: String,
+    pub backend: String,                 // "groth16" | "ultrahonk" | "risc0"
+    pub profile: String,                 // "development" | "testnet" | "stellar-production"
+    pub circuit: CircuitConfig,
+    pub contract: ContractConfig,
+    pub deploy: DeployConfig,
+}
+
+pub struct CircuitConfig {
+    pub entry_point: PathBuf,            // e.g. "circuits/main.circom"
+    pub input_file: PathBuf,             // e.g. "inputs/input.json"
+}
+
+pub struct ContractConfig {
+    pub name: String,                    // e.g. "groth16_verifier"
+    pub source_dir: PathBuf,             // e.g. "contracts/verifier"
+    pub wasm_output: PathBuf,            // e.g. "target/wasm32v1-none/release/groth16_verifier.wasm"
+}
+
+pub struct DeployConfig {
+    pub network: String,                 // "local" | "testnet" | "mainnet"
+    pub source_identity: String,         // Stellar identity name or secret key
+}
+```
+
+### BackendConfig (backend.config.json)
+
+```
+pub struct BackendConfig {
+    pub backend: String,
+    pub groth16: Option<Groth16Config>,
+    pub ultrahonk: Option<UltraHonkConfig>,
+    pub risc0: Option<Risc0Config>,
+}
+
+pub struct Groth16Config {
+    pub curve: String,                   // "bn254"
+    pub trusted_setup: Option<String>,   // Path to ptau file (null = auto-generate)
+    pub circuit_power: u32,              // Powers of Tau size (default: 14)
+}
+
+pub struct UltraHonkConfig {
+    pub oracle_hash: String,             // "keccak"
+    pub recursive: bool,                 // false
+}
+
+pub struct Risc0Config {
+    pub guest_target: String,            // "riscv32im-risc0-zkvm-elf"
+    pub segment_limit_po2: u32,          // 20
+    pub groth16_wrap: bool,              // true (wrap STARK in Groth16 for on-chain)
+}
+```
+
+### OptimizationProfile
+
+```
+pub struct OptimizationProfile {
+    pub name: String,                    // "development" | "testnet" | "stellar-production"
+    pub cargo_profile: String,           // "dev" | "release"
+    pub opt_level: String,               // "0" | "s" | "z"
+    pub lto: bool,
+    pub strip_symbols: bool,
+    pub codegen_units: u32,              // 256 (dev) | 1 (release)
+    pub wasm_opt_level: WasmOptLevel,    // None | Os | Oz
+    pub overflow_checks: bool,           // Always true (security-critical)
+    pub enforce_size_limit: bool,        // 64KB WASM limit
+    pub enforce_cpu_limit: bool,         // 100M CPU instruction limit
+}
+
+pub enum WasmOptLevel {
+    None,    // development
+    Os,      // testnet
+    Oz,      // stellar-production
+}
+
+pub const MAX_WASM_SIZE: u64 = 65_536;
+pub const MAX_CPU_INSTRUCTIONS: u64 = 100_000_000;
+```
+
+Profile presets:
+
+| Setting | development | testnet | stellar-production |
+|---------|------------|---------|-------------------|
+| cargo_profile | dev | release | release |
+| opt_level | 0 | s | z |
+| lto | false | true | true |
+| strip_symbols | false | false | true |
+| codegen_units | 256 | 1 | 1 |
+| wasm_opt_level | None | Os | Oz |
+| enforce_size_limit | false | true | true |
+| enforce_cpu_limit | false | false | true |
+
+### WasmOutput
+
+```
+pub struct WasmOutput {
+    pub path: PathBuf,                   // Final WASM path
+    pub size_bytes: u64,                 // Final size
+    pub optimized: bool,                 // Whether wasm-opt was applied
+    pub stage_sizes: Vec<(String, u64)>, // Size at each pipeline stage
+}
+```
+
+### SimulateResult
+
+```
+pub struct SimulateResult {
+    pub cpu_instructions: u64,
+    pub memory_bytes: u64,
+    pub resource_fee_stroops: u64,
+    pub ledger_reads: u32,
+    pub ledger_writes: u32,
+}
+```
+
+### CLI Enums
+
+```
+pub enum BackendChoice { Groth16, Ultrahonk, Risc0 }
+pub enum ProfileChoice { Development, Testnet, StellarProduction }
+pub enum NetworkChoice { Local, Testnet, Mainnet }
+```
+
+## Error Variants
+
+All errors are in `StellarZkError` (crates/stellar-zk-core/src/error.rs), using thiserror.
+
+### ConfigNotFound
+  Fields: path: PathBuf, source: io::Error
+  Message: "config file not found at {path}"
+  When: stellar-zk.config.json or backend.config.json not found
+  Fix: Run from a stellar-zk project directory, or use --config flag
+
+### ConfigParse
+  Fields: path: PathBuf, source: serde_json::Error
+  Message: "failed to parse config at {path}"
+  When: Config file exists but contains invalid JSON
+  Fix: Validate JSON syntax and required fields
+
+### UnknownBackend
+  Fields: String (the name)
+  Message: "unknown backend: {0} (supported: groth16, ultrahonk, risc0)"
+  When: Backend name doesn't match any supported backend
+  Fix: Use one of: groth16, ultrahonk, risc0
+
+### UnknownProfile
+  Fields: String (the name)
+  Message: "unknown profile: {0} (supported: development, testnet, stellar-production)"
+  When: Profile name doesn't match any preset
+  Fix: Use one of: development, testnet, stellar-production
+
+### MissingTool
+  Fields: name: String, install: String
+  Message: "required tool '{name}' not found — install: {install}"
+  When: External tool (circom, snarkjs, nargo, bb, stellar) not in PATH
+  Fix: Install the tool as described in the install field
+
+### CircuitCompilation
+  Fields: String (stderr)
+  Message: "circuit compilation failed: {0}"
+  When: Circom syntax error, Noir type error, or guest compilation failure
+  Fix: Check circuit source for errors
+
+### ContractBuild
+  Fields: String (stderr)
+  Message: "contract build failed: {0}"
+  When: Soroban verifier contract cargo build fails
+  Fix: Check contract source and Cargo.toml
+
+### WasmOptFailed
+  Fields: String (stderr)
+  Message: "WASM optimization failed: {0}"
+  When: wasm-opt returns non-zero
+  Fix: Check wasm-opt installation and WASM validity
+
+### WasmTooLarge
+  Fields: size: u64, max: u64, path: PathBuf
+  Message: "WASM too large: {size} bytes (max {max}) at {path}"
+  When: Compiled WASM exceeds 64KB and profile enforces the limit
+  Fix: Use more aggressive optimization, reduce contract complexity, or use development profile
+
+### ProofGeneration
+  Fields: String (details)
+  Message: "proof generation failed: {0}"
+  When: Witness computation, proving, or serialization fails
+  Fix: Check input data, circuit constraints, and external tool output
+
+### InputNotFound
+  Fields: PathBuf
+  Message: "input file not found: {0}"
+  When: The --input file doesn't exist
+  Fix: Provide correct path to input JSON
+
+### StellarCli
+  Fields: String (stderr)
+  Message: "stellar CLI error: {0}"
+  When: stellar contract invoke fails
+  Fix: Check contract ID, network, source identity, and argument format
+
+### DeployFailed
+  Fields: String (stderr)
+  Message: "deployment failed: {0}"
+  When: stellar contract deploy fails
+  Fix: Check WASM, network connectivity, source account funding
+
+### TemplateRender
+  Fields: String (details)
+  Message: "template rendering failed: {0}"
+  When: Handlebars rendering fails (missing variable, invalid template)
+  Fix: Check template syntax and provided variables
+
+### ProjectExists
+  Fields: PathBuf
+  Message: "project directory already exists: {0}"
+  When: init target directory already exists
+  Fix: Choose a different name or remove the existing directory
+
+### NotAProject
+  Message: "not a stellar-zk project (missing stellar-zk.config.json)"
+  When: Running build/prove/deploy/call outside a project directory
+  Fix: cd into a stellar-zk project, or use --config to point to config
+
+### Io
+  Transparent wrapper around std::io::Error
+
+### Other
+  Transparent wrapper around anyhow::Error
+
+## Configuration Schemas
+
+### stellar-zk.config.json (Groth16 example)
+
+```json
+{
+  "version": "0.1.0",
+  "project_name": "myapp",
+  "backend": "groth16",
+  "profile": "development",
+  "circuit": {
+    "entry_point": "circuits/main.circom",
+    "input_file": "inputs/input.json"
+  },
+  "contract": {
+    "name": "groth16_verifier",
+    "source_dir": "contracts/verifier",
+    "wasm_output": "target/wasm32v1-none/release/groth16_verifier.wasm"
+  },
+  "deploy": {
+    "network": "testnet",
+    "source_identity": "default"
+  }
+}
+```
+
+Entry points per backend:
+  Groth16:   circuits/main.circom
+  UltraHonk: circuits/src/main.nr
+  RISC Zero:  programs/guest/src/main.rs
+
+### backend.config.json — Groth16
+
+```json
+{
+  "backend": "groth16",
+  "groth16": {
+    "curve": "bn254",
+    "trusted_setup": null,
+    "circuit_power": 14
+  }
+}
+```
+
+### backend.config.json — UltraHonk
+
+```json
+{
+  "backend": "ultrahonk",
+  "ultrahonk": {
+    "oracle_hash": "keccak",
+    "recursive": false
+  }
+}
+```
+
+### backend.config.json — RISC Zero
+
+```json
+{
+  "backend": "risc0",
+  "risc0": {
+    "guest_target": "riscv32im-risc0-zkvm-elf",
+    "segment_limit_po2": 20,
+    "groth16_wrap": true
+  }
+}
+```
+
+## Proof Formats & Serialization
+
+### BN254 Point Encoding
+
+G1 point (64 bytes): x(32 BE) | y(32 BE)
+G2 point (128 bytes): x_c1(32 BE) | x_c0(32 BE) | y_c1(32 BE) | y_c0(32 BE)
+
+IMPORTANT: G2 component ordering — snarkjs outputs [c0, c1] but Soroban expects c1 | c0 (higher-degree coefficient first). The serializer swaps these.
+
+Field elements: 32 bytes, big-endian, zero-padded on the left.
+Source format: snarkjs outputs decimal strings (e.g., "21888242871839275222246405745257275088696311157297823662689037894645226208583").
+
+### Groth16 Proof (256 bytes)
+
+Layout: A(G1:64) | B(G2:128) | C(G1:64)
+
+  Offset 0-63:    A point (G1) — pi_a from snarkjs
+  Offset 64-191:  B point (G2) — pi_b from snarkjs (with c1/c0 swap)
+  Offset 192-255: C point (G1) — pi_c from snarkjs
+
+snarkjs source JSON:
+```json
+{
+  "pi_a": ["x_dec", "y_dec", "1"],
+  "pi_b": [["x_c0_dec", "x_c1_dec"], ["y_c0_dec", "y_c1_dec"], ["1", "0"]],
+  "pi_c": ["x_dec", "y_dec", "1"]
+}
+```
+
+### Verification Key (variable size)
+
+Layout: alpha(G1:64) | beta(G2:128) | gamma(G2:128) | delta(G2:128) | ic_count(u32 BE:4) | IC[0..n](G1:64 each)
+
+Total size: 448 + 4 + (ic_count * 64) bytes
+Example with 2 IC points: 448 + 4 + 128 = 580 bytes
+
+  Offset 0-63:    alpha (G1)
+  Offset 64-191:  beta (G2)
+  Offset 192-319: gamma (G2)
+  Offset 320-447: delta (G2)
+  Offset 448-451: ic_count (u32 big-endian)
+  Offset 452+:    IC points (64 bytes each, G1)
+
+snarkjs source JSON fields: vk_alpha_1, vk_beta_2, vk_gamma_2, vk_delta_2, IC
+
+### UltraHonk Proof (~14 KB)
+
+Variable-size proof containing sumcheck proofs and commitments. Read as raw bytes from bb prove_ultra_honk output.
+
+### RISC Zero Seal (260 bytes)
+
+Layout: selector(4) | Groth16_proof(256)
+
+  Offset 0-3:   Selector [0x31, 0x0f, 0xe5, 0x98] — identifies RISC Zero Groth16 circuit version
+  Offset 4-259: Standard Groth16 proof (A | B | C)
+
+Validation: check selector bytes AND total length == 260.
+
+### public_inputs.json
+
+Format: array of hex-encoded 32-byte field elements.
+Written by prove command, read by call command.
+Each element is a big-endian encoded BN254 scalar field element.
+
+## Contract API
+
+All generated verifier contracts share this interface.
+
+### VerifierError enum (u32 repr)
+
+```
+InvalidProofLength = 1       // Proof bytes wrong size
+InvalidPublicInputCount = 2  // public_inputs.len() == 0 or not multiple of 32
+VerificationFailed = 3       // Pairing check returned false
+VkNotSet = 4                 // __constructor was not called / VK missing from storage
+NullifierAlreadyUsed = 5     // This proof+inputs pair was already verified
+```
+
+### DataKey enum (contract storage keys)
+
+```
+DataKey::Vk                  // Instance storage — verification key bytes
+DataKey::Nullifier(BytesN<32>)  // Persistent storage — used nullifiers
+DataKey::VerifyCount         // Instance storage — u64 counter
+```
+
+### Functions
+
+#### __constructor(env: Env, vk_bytes: Bytes)
+Called at deploy time. Stores VK in instance storage. Initializes VerifyCount to 0.
+
+#### verify(env: Env, proof: BytesN<256>, public_inputs: Bytes, nullifier: BytesN<32>) -> Result<bool, VerifierError>
+Main entry point. Steps:
+  1. Check nullifier not already used (persistent storage) -> NullifierAlreadyUsed
+  2. Validate public_inputs: len > 0 and len % 32 == 0 -> InvalidPublicInputCount
+  3. Load VK from instance storage -> VkNotSet
+  4. Parse proof: A = proof[0..64] as G1, B = proof[64..192] as G2, C = proof[192..256] as G1
+  5. Parse VK: alpha(G1), beta(G2), gamma(G2), delta(G2), ic_count(u32 BE), IC[](G1)
+  6. Compute vk_x = IC[0] + sum(public_input[i] * IC[i+1]) using bn254.g1_mul and bn254.g1_add
+  7. Compute neg_a = bn254.g1_neg(A)
+  8. Pairing check: bn254.pairing_check([neg_a, alpha, vk_x, C], [B, beta, gamma, delta])
+  9. If false -> VerificationFailed
+  10. Store nullifier in persistent storage
+  11. Increment VerifyCount
+  12. Emit event: ("verified", (nullifier, num_inputs))
+  13. Return Ok(true)
+
+#### is_nullifier_used(env: Env, nullifier: BytesN<32>) -> bool
+Checks persistent storage for the nullifier key.
+
+#### verify_count(env: Env) -> u64
+Returns the verification counter from instance storage (0 if not set).
+
+## Backend Comparison
+
+| | Groth16 | UltraHonk | RISC Zero |
+|---|---------|-----------|-----------|
+| Circuit language | Circom | Noir | Rust |
+| Proof size | 256 B | ~14 KB | 260 B |
+| On-chain CPU (base) | ~10M | ~35M | ~15M |
+| Per-input CPU | +500K | +200K | fixed (2 inputs) |
+| WASM size estimate | ~45 KB | ~55 KB | ~48 KB |
+| Memory estimate | 500 KB | 2 MB | 600 KB |
+| Ledger reads | 2 | 2 | 2 |
+| Ledger writes | 2 | 1 | 2 |
+| Trusted setup | Yes (per-circuit) | No (universal SRS) | No (universal) |
+| Verification method | BN254 pairing check | Sumcheck + MSM | BN254 pairing check (Groth16 seal) |
+| Best for | Simple proofs, lowest cost | Modern ZK, complex logic | Arbitrary Rust computation |
+
+## Build Pipeline
+
+### WASM optimization pipeline (crates/stellar-zk-core/src/pipeline.rs)
+
+Stage 1: cargo build
+  - Target: wasm32-unknown-unknown
+  - Profile: dev (development) or release (testnet/production)
+
+Stage 2: wasm-opt (if profile enables it)
+  - -Os for testnet
+  - -Oz for stellar-production
+  - Skipped if wasm-opt not installed (warning logged)
+  - Output: *.opt.wasm
+
+Stage 3: wasm-strip (if profile.strip_symbols is true)
+  - Removes debug symbols and custom sections
+  - Skipped if wasm-strip not installed (warning logged)
+  - Output: *.stripped.wasm
+
+Stage 4: Size validation
+  - If profile.enforce_size_limit: reject WASM > 65,536 bytes (WasmTooLarge error)
+
+### Build steps per backend
+
+Groth16:
+  1. circom compile -> .r1cs + .wasm (witness calculator)
+  2. snarkjs powersoftau new bn128 {power} -> ptau file
+  3. snarkjs powersoftau contribute -> final ptau
+  4. snarkjs groth16 setup .r1cs .ptau -> .zkey (proving key)
+  5. snarkjs zkey export verificationkey -> vk.json
+  6. Serialize VK JSON to binary format
+  7. Render contract template with Handlebars
+  8. WASM pipeline (cargo -> wasm-opt -> strip -> validate)
+
+UltraHonk:
+  1. nargo compile -> ACIR artifact
+  2. bb write_vk -b <acir> -> VK binary
+  3. Render contract template
+  4. WASM pipeline
+
+RISC Zero:
+  1. cargo build --target riscv32im-risc0-zkvm-elf (guest)
+  2. cargo build (host binary)
+  3. Cache image_id and config
+  4. Render contract template
+  5. WASM pipeline
+
+## Prerequisites
+
+### All backends
+- Rust 1.84.0+: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+- Stellar CLI: https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli
+
+### Groth16
+- Circom: https://docs.circom.io/getting-started/installation/
+- snarkjs: npm install -g snarkjs
+- Node.js: https://nodejs.org/
+
+### UltraHonk
+- nargo (Noir toolchain): noirup — https://noir-lang.org/docs/getting_started/noir_installation/
+- bb (Barretenberg): bbup — https://github.com/AztecProtocol/aztec-packages/tree/master/barretenberg
+
+### RISC Zero
+- cargo-risczero: curl -L https://risczero.com/install | bash && rzup install
+- Docker: https://docs.docker.com/get-docker/ (for Groth16 wrapping)
+
+## Template System
+
+### How it works
+
+Templates live in `templates/` and are embedded into the binary at compile time via `include_str!` macros in `crates/stellar-zk-core/src/templates/embedded.rs`.
+
+At runtime, Handlebars renders the templates with project-specific variables (e.g., `{{contract_name}}`).
+
+### Embedded constants (embedded.rs)
+
+Circuit/program templates:
+  GROTH16_CIRCUIT          templates/circuits/groth16/example.circom
+  ULTRAHONK_CIRCUIT        templates/circuits/ultrahonk/src/main.nr
+  ULTRAHONK_NARGO_TOML     templates/circuits/ultrahonk/Nargo.toml
+  RISC0_HOST               templates/circuits/risc0/host/src/main.rs
+  RISC0_GUEST              templates/circuits/risc0/guest/src/main.rs
+  RISC0_GUEST_CARGO_TOML   templates/circuits/risc0/guest/Cargo.toml
+  RISC0_HOST_CARGO_TOML    templates/circuits/risc0/host/Cargo.toml
+
+Contract templates:
+  GROTH16_CONTRACT_CARGO   templates/contracts/groth16_verifier/Cargo.toml.tmpl
+  GROTH16_CONTRACT_LIB     templates/contracts/groth16_verifier/src/lib.rs.tmpl
+  ULTRAHONK_CONTRACT_CARGO templates/contracts/ultrahonk_verifier/Cargo.toml.tmpl
+  ULTRAHONK_CONTRACT_LIB   templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl
+  RISC0_CONTRACT_CARGO     templates/contracts/risc0_verifier/Cargo.toml.tmpl
+  RISC0_CONTRACT_LIB       templates/contracts/risc0_verifier/src/lib.rs.tmpl
+
+Config templates:
+  INPUT_JSON               templates/config/input.json.tmpl
+
+### Handlebars variables
+
+  {{contract_name}}    Contract struct name (e.g., "Groth16Verifier")
+  {{project_name}}     Project name from init
+
+## Cost Estimation
+
+### Tier 1: Static Models (crates/stellar-zk-core/src/estimator.rs)
+
+Groth16:
+  cpu = 10,000,000 + (num_public_inputs * 500,000)
+  memory = 500,000 bytes
+  wasm_size = 45,000 bytes
+  ledger_reads = 2, ledger_writes = 2
+  Warning at: cpu > 70% of 100M limit
+  Warning at: num_public_inputs > 20
+
+UltraHonk:
+  cpu = 35,000,000 + (num_public_inputs * 200,000)
+  memory = 2,000,000 bytes
+  wasm_size = 55,000 bytes
+  ledger_reads = 2, ledger_writes = 1
+  Always warns: "most CPU-intensive backend"
+
+RISC Zero:
+  cpu = 15,000,000 (fixed, 2 public inputs: image_id + journal_hash)
+  memory = 600,000 bytes
+  wasm_size = 48,000 bytes
+  ledger_reads = 2, ledger_writes = 2
+
+### Fee formula
+
+  estimated_fee_stroops = 100 + (cpu_instructions / 10,000)
+
+### Warning thresholds
+
+  CPU:  >70% of 100M -> WARN, >100% -> FAIL
+  WASM: >75% of 64KB -> WARN, >100% -> FAIL
+
+### Report format
+
+Outputs a table with: Resource, Estimated, Limit, Usage %, Status [OK/WARN/FAIL].
+
+## Soroban Resource Limits
+
+- Max WASM size: 64 KB (65,536 bytes)
+- Max CPU instructions per tx: 100,000,000 (100M)
+- Max memory: ~40 MB (network-configured)
+- Max ledger reads: ~40
+- Max ledger writes: ~20
+- BN254 host functions: g1_add, g1_mul, g1_neg, g1_from_bytes, g2_from_bytes, fr_from_bytes, pairing_check
+- Protocol: 25+
+
+## Workspace Structure
+
+```
+stellar-zk/
+├── Cargo.toml                            # Workspace manifest
+├── CLAUDE.md                             # Claude Code instructions
+├── README.md                             # Full documentation
+├── CONTRIBUTING.md                       # Contributor guide
+├── ROADMAP.md                            # Development roadmap
+├── CHANGELOG.md                          # Version history
+├── LICENSE-MIT / LICENSE-APACHE           # Dual license
+├── llms.txt                              # LLM summary (this project)
+├── llms-full.txt                         # LLM full reference (this file)
+├── crates/
+│   ├── stellar-zk-cli/src/
+│   │   ├── main.rs                       # CLI definition + dispatch
+│   │   ├── output.rs                     # Terminal formatting
+│   │   └── commands/
+│   │       ├── init.rs                   # Scaffolding + create_backend factory
+│   │       ├── build.rs                  # Circuit + WASM build
+│   │       ├── prove.rs                  # Proof generation
+│   │       ├── deploy.rs                 # Contract deployment
+│   │       ├── call.rs                   # Contract invocation + nullifier
+│   │       └── estimate.rs              # Cost estimation (3 tiers)
+│   ├── stellar-zk-core/src/
+│   │   ├── backend.rs                    # ZkBackend trait + artifact types
+│   │   ├── config.rs                     # ProjectConfig + BackendConfig
+│   │   ├── error.rs                      # StellarZkError (16 variants)
+│   │   ├── estimator.rs                  # Static cost models
+│   │   ├── pipeline.rs                   # WASM pipeline (cargo -> wasm-opt -> strip)
+│   │   ├── profile.rs                    # OptimizationProfile (3 presets)
+│   │   ├── project.rs                    # Directory creation, config I/O
+│   │   ├── artifacts.rs                  # BuildArtifacts persistence (JSON)
+│   │   ├── stellar.rs                    # Stellar CLI wrapper
+│   │   └── templates/
+│   │       ├── embedded.rs               # include_str! constants
+│   │       └── renderer.rs               # Handlebars engine
+│   ├── stellar-zk-groth16/src/
+│   │   ├── lib.rs                        # Groth16Backend impl
+│   │   ├── circuit.rs                    # Circom compilation
+│   │   ├── prover.rs                     # snarkjs keygen + prove
+│   │   └── serializer.rs                # BN254 serialization (9 tests)
+│   ├── stellar-zk-ultrahonk/src/
+│   │   ├── lib.rs                        # UltraHonkBackend impl
+│   │   ├── nargo.rs                      # nargo + bb wrappers
+│   │   ├── proof_convert.rs              # Public input extraction
+│   │   └── serializer.rs                # Proof format utilities
+│   └── stellar-zk-risc0/src/
+│       ├── lib.rs                        # Risc0Backend impl
+│       ├── guest.rs                      # Guest ELF + host build
+│       ├── prover.rs                     # Host binary execution
+│       └── serializer.rs                # Seal validation (5 tests)
+└── templates/
+    ├── circuits/
+    │   ├── groth16/example.circom
+    │   ├── ultrahonk/  (Nargo.toml + src/main.nr)
+    │   └── risc0/      (guest/ + host/)
+    ├── contracts/
+    │   ├── groth16_verifier/   (Cargo.toml.tmpl + src/lib.rs.tmpl)
+    │   ├── ultrahonk_verifier/ (Cargo.toml.tmpl + src/lib.rs.tmpl)
+    │   └── risc0_verifier/     (Cargo.toml.tmpl + src/lib.rs.tmpl)
+    └── config/
+        └── input.json.tmpl
+```

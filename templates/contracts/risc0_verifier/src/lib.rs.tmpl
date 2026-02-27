@@ -1,0 +1,176 @@
+#![no_std]
+
+use soroban_sdk::{
+    contract, contractimpl, contracterror, contracttype,
+    symbol_short, Bytes, BytesN, Env, Vec,
+};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum VerifierError {
+    InvalidSealLength = 1,
+    InvalidSelector = 2,
+    InvalidPublicInputCount = 3,
+    VerificationFailed = 4,
+    VkNotSet = 5,
+    NullifierAlreadyUsed = 6,
+}
+
+#[contracttype]
+pub enum DataKey {
+    Vk,
+    Nullifier(BytesN<32>),
+    VerifyCount,
+}
+
+/// RISC Zero Groth16 seal selector — identifies the circuit version.
+const SELECTOR: [u8; 4] = [0x31, 0x0f, 0xe5, 0x98];
+
+#[contract]
+pub struct {{contract_name}};
+
+#[contractimpl]
+impl {{contract_name}} {
+    /// Initialize with the verification key (same Groth16 VK format).
+    ///
+    /// VK layout: alpha(64) | beta(128) | gamma(128) | delta(128) | ic_count(4) | ic[](64 each)
+    pub fn __constructor(env: Env, vk_bytes: Bytes) {
+        env.storage().instance().set(&DataKey::Vk, &vk_bytes);
+        env.storage().instance().set(&DataKey::VerifyCount, &0u64);
+    }
+
+    /// Get the expected 4-byte selector for this verifier version.
+    pub fn selector(env: Env) -> BytesN<4> {
+        BytesN::from_array(&env, &SELECTOR)
+    }
+
+    /// Verify a RISC Zero Groth16 receipt.
+    ///
+    /// - `proof`: raw seal bytes (4-byte selector + 256-byte Groth16 proof)
+    /// - `public_inputs`: image_id(32) || journal_digest(32) = 64 bytes
+    /// - `nullifier`: 32-byte anti-replay token
+    pub fn verify(
+        env: Env,
+        proof: Bytes,
+        public_inputs: Bytes,
+        nullifier: BytesN<32>,
+    ) -> Result<bool, VerifierError> {
+        // Nullifier check
+        let nk = DataKey::Nullifier(nullifier.clone());
+        if env.storage().persistent().has(&nk) {
+            return Err(VerifierError::NullifierAlreadyUsed);
+        }
+
+        // Validate public inputs length (must be N x 32 bytes)
+        if public_inputs.len() == 0 || public_inputs.len() % 32 != 0 {
+            return Err(VerifierError::InvalidPublicInputCount);
+        }
+
+        // Validate seal length: 4-byte selector + 256-byte Groth16 proof
+        if proof.len() != 260 {
+            return Err(VerifierError::InvalidSealLength);
+        }
+
+        // Validate and strip selector
+        let sel = [
+            proof.get(0).unwrap(),
+            proof.get(1).unwrap(),
+            proof.get(2).unwrap(),
+            proof.get(3).unwrap(),
+        ];
+        if sel != SELECTOR {
+            return Err(VerifierError::InvalidSelector);
+        }
+
+        // Extract Groth16 proof: A(64) | B(128) | C(64)
+        let proof_data = proof.slice(4..260);
+
+        // Load VK
+        let vk: Bytes = env
+            .storage()
+            .instance()
+            .get(&DataKey::Vk)
+            .ok_or(VerifierError::VkNotSet)?;
+
+        let bn254 = env.crypto().bn254();
+
+        // Parse proof points
+        let a = bn254.g1_from_bytes(&proof_data.slice(0..64));
+        let b = bn254.g2_from_bytes(&proof_data.slice(64..192));
+        let c = bn254.g1_from_bytes(&proof_data.slice(192..256));
+
+        // Parse VK: alpha(64) | beta(128) | gamma(128) | delta(128) | ic_count(4) | ic[](64 each)
+        let alpha = bn254.g1_from_bytes(&vk.slice(0..64));
+        let beta = bn254.g2_from_bytes(&vk.slice(64..192));
+        let gamma = bn254.g2_from_bytes(&vk.slice(192..320));
+        let delta = bn254.g2_from_bytes(&vk.slice(320..448));
+
+        let ic_count = {
+            let b0 = vk.get(448).unwrap() as u32;
+            let b1 = vk.get(449).unwrap() as u32;
+            let b2 = vk.get(450).unwrap() as u32;
+            let b3 = vk.get(451).unwrap() as u32;
+            (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
+        };
+
+        // Compute vk_x = ic[0] + sum(public_input[i] * ic[i+1])
+        let ic_base = 452u32;
+        let mut vk_x = bn254.g1_from_bytes(&vk.slice(ic_base..(ic_base + 64)));
+
+        let num_inputs = public_inputs.len() / 32;
+        for i in 0..num_inputs {
+            let input_offset = i * 32;
+            let fr = bn254.fr_from_bytes(&public_inputs.slice(input_offset..(input_offset + 32)));
+            let ic_offset = ic_base + ((i + 1) * 64);
+            let ic_point = bn254.g1_from_bytes(&vk.slice(ic_offset..(ic_offset + 64)));
+            let term = bn254.g1_mul(&ic_point, &fr);
+            vk_x = bn254.g1_add(&vk_x, &term);
+        }
+
+        // Pairing check: e(-A, B) * e(alpha, beta) * e(vk_x, gamma) * e(C, delta) == 1
+        let neg_a = bn254.g1_neg(&a);
+
+        let g1_vec = Vec::from_array(&env, [neg_a, alpha, vk_x, c]);
+        let g2_vec = Vec::from_array(&env, [b, beta, gamma, delta]);
+
+        let valid = bn254.pairing_check(g1_vec, g2_vec);
+        if !valid {
+            return Err(VerifierError::VerificationFailed);
+        }
+
+        // Store nullifier
+        env.storage().persistent().set(&nk, &true);
+
+        // Increment counter
+        let count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::VerifyCount)
+            .unwrap_or(0);
+        env.storage().instance().set(&DataKey::VerifyCount, &(count + 1));
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("verified"),),
+            (nullifier, num_inputs),
+        );
+
+        Ok(true)
+    }
+
+    /// Check if a nullifier has been used.
+    pub fn is_nullifier_used(env: Env, nullifier: BytesN<32>) -> bool {
+        env.storage()
+            .persistent()
+            .has(&DataKey::Nullifier(nullifier))
+    }
+
+    /// Get the total number of successful verifications.
+    pub fn verify_count(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::VerifyCount)
+            .unwrap_or(0)
+    }
+}
