@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Noir + UltraHonk backend for stellar-zk (nargo + Barretenberg)"
+repository.workspace = true
+homepage.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 stellar-zk-core.workspace = true

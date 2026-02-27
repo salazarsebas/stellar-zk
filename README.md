@@ -2,7 +2,8 @@
 
 **ZK DevKit for Stellar/Soroban** — unified CLI for Groth16, UltraHonk, and RISC Zero.
 
-[![CI](https://github.com/stellar-zk/stellar-zk/actions/workflows/ci.yml/badge.svg)](https://github.com/stellar-zk/stellar-zk/actions/workflows/ci.yml)
+[![CI](https://github.com/salazarsebas/stellar-zk/actions/workflows/ci.yml/badge.svg)](https://github.com/salazarsebas/stellar-zk/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/stellar-zk.svg)](https://crates.io/crates/stellar-zk)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 [![Rust](https://img.shields.io/badge/rust-1.84%2B-orange.svg)](https://www.rust-lang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -49,8 +50,8 @@ Built for Stellar Protocol 25, which introduced native BN254 host functions (`g1
 ## Quick Start
 
 ```bash
-# Install from source
-cargo install --path crates/stellar-zk-cli
+# Install (see Installation section for all options)
+curl -fsSL https://raw.githubusercontent.com/salazarsebas/stellar-zk/main/scripts/install.sh | bash
 
 # Create a new project with Groth16
 stellar-zk init myapp --backend groth16
@@ -76,10 +77,41 @@ stellar-zk call --contract-id CXYZ... --proof proofs/proof.bin --source alice
 
 ## Installation
 
+### Pre-built binaries (recommended)
+
+Download and install the latest release with the install script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/salazarsebas/stellar-zk/main/scripts/install.sh | bash
+```
+
+You can also specify a version:
+
+```bash
+STELLAR_ZK_VERSION=0.1.0 curl -fsSL https://raw.githubusercontent.com/salazarsebas/stellar-zk/main/scripts/install.sh | bash
+```
+
+Or download binaries directly from [GitHub Releases](https://github.com/salazarsebas/stellar-zk/releases).
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap salazarsebas/tap
+brew install stellar-zk
+```
+
+### crates.io
+
+Requires [Rust](https://rustup.rs/) 1.84.0+:
+
+```bash
+cargo install stellar-zk
+```
+
 ### From source
 
 ```bash
-git clone https://github.com/stellar-zk/stellar-zk.git
+git clone https://github.com/salazarsebas/stellar-zk.git
 cd stellar-zk
 cargo install --path crates/stellar-zk-cli
 ```
@@ -92,7 +124,6 @@ stellar-zk --help
 
 ### Requirements
 
-- **Rust 1.84.0+** — install via [rustup](https://rustup.rs/)
 - **Stellar CLI** — for deploy/call commands ([installation guide](https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli))
 
 Backend-specific prerequisites are listed in the [Prerequisites](#prerequisites) section below.

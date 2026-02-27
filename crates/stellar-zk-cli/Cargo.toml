@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "ZK DevKit for Stellar/Soroban — unified CLI for Groth16, UltraHonk, and RISC Zero"
+repository.workspace = true
+homepage.workspace = true
+readme = "../../README.md"
 
 [[bin]]
 name = "stellar-zk"

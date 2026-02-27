@@ -13,8 +13,8 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.84.0"
-repository = "https://github.com/stellar-zk/stellar-zk"
-homepage = "https://github.com/stellar-zk/stellar-zk"
+repository = "https://github.com/salazarsebas/stellar-zk"
+homepage = "https://github.com/salazarsebas/stellar-zk"
 keywords = ["stellar", "soroban", "zk", "groth16", "zero-knowledge"]
 categories = ["cryptography", "command-line-utilities"]
 authors = ["stellar-zk contributors"]
@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 
 # Internal crates
-stellar-zk-core = { path = "crates/stellar-zk-core" }
-stellar-zk-groth16 = { path = "crates/stellar-zk-groth16" }
-stellar-zk-ultrahonk = { path = "crates/stellar-zk-ultrahonk" }
-stellar-zk-risc0 = { path = "crates/stellar-zk-risc0" }
+stellar-zk-core = { path = "crates/stellar-zk-core", version = "0.1.0" }
+stellar-zk-groth16 = { path = "crates/stellar-zk-groth16", version = "0.1.0" }
+stellar-zk-ultrahonk = { path = "crates/stellar-zk-ultrahonk", version = "0.1.0" }
+stellar-zk-risc0 = { path = "crates/stellar-zk-risc0", version = "0.1.0" }

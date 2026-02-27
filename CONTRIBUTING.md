@@ -6,7 +6,7 @@ Thank you for your interest in contributing to stellar-zk!
 
 ```bash
 # Clone the repository
-git clone https://github.com/stellar-zk/stellar-zk.git
+git clone https://github.com/salazarsebas/stellar-zk.git
 cd stellar-zk
 
 # Build the workspace
@@ -63,7 +63,7 @@ These rules exist to maintain correctness and prevent subtle bugs:
 
 ## Pull Requests
 
-We use [issue templates](https://github.com/stellar-zk/stellar-zk/issues/new/choose) and a [PR template](https://github.com/stellar-zk/stellar-zk/blob/main/.github/PULL_REQUEST_TEMPLATE.md) to keep contributions structured.
+We use [issue templates](https://github.com/salazarsebas/stellar-zk/issues/new/choose) and a [PR template](https://github.com/salazarsebas/stellar-zk/blob/main/.github/PULL_REQUEST_TEMPLATE.md) to keep contributions structured.
 
 ### Process
 
@@ -107,7 +107,7 @@ See the [CLAUDE.md](CLAUDE.md) "Common Workflows" section for detailed step-by-s
 
 ## Reporting Issues
 
-Please use the [issue templates](https://github.com/stellar-zk/stellar-zk/issues/new/choose):
+Please use the [issue templates](https://github.com/salazarsebas/stellar-zk/issues/new/choose):
 
 - **Bug Report**: for reproducible problems
 - **Feature Request**: for suggestions and enhancements

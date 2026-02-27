@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for suggesting a feature! Check the [ROADMAP](https://github.com/stellar-zk/stellar-zk/blob/main/ROADMAP.md) for already-planned features.
+        Thank you for suggesting a feature! Check the [ROADMAP](https://github.com/salazarsebas/stellar-zk/blob/main/ROADMAP.md) for already-planned features.
 
   - type: textarea
     id: summary

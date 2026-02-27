@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }} -p stellar-zk
+
+      - name: Determine binary name
+        id: bin
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            echo "name=stellar-zk.exe" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=stellar-zk" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create archive (unix)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          archive="stellar-zk-${tag}-${{ matrix.target }}.tar.gz"
+          staging="stellar-zk-${tag}-${{ matrix.target }}"
+          mkdir -p "$staging"
+          cp "target/${{ matrix.target }}/release/${{ steps.bin.outputs.name }}" "$staging/"
+          cp README.md "$staging/" 2>/dev/null || true
+          cp LICENSE-MIT "$staging/" 2>/dev/null || true
+          cp LICENSE-APACHE "$staging/" 2>/dev/null || true
+          tar czf "$archive" "$staging"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Create archive (windows)
+        if: matrix.archive == 'zip'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          archive="stellar-zk-${tag}-${{ matrix.target }}.zip"
+          staging="stellar-zk-${tag}-${{ matrix.target }}"
+          mkdir -p "$staging"
+          cp "target/${{ matrix.target }}/release/${{ steps.bin.outputs.name }}" "$staging/"
+          cp README.md "$staging/" 2>/dev/null || true
+          cp LICENSE-MIT "$staging/" 2>/dev/null || true
+          cp LICENSE-APACHE "$staging/" 2>/dev/null || true
+          7z a "$archive" "$staging"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-${{ matrix.target }}
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: archive-*
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          for file in stellar-zk-*; do
+            sha256sum "$file" > "${file}.sha256"
+          done
+          sha256sum stellar-zk-* | grep -v '\.sha256$' > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            stellar-zk-*
+            SHA256SUMS.txt
+
+  update-homebrew:
+    name: Update Homebrew Formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download checksums
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release download "$tag" --pattern "SHA256SUMS.txt"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate formula
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+
+          sha_linux_x86=$(grep "x86_64-unknown-linux-gnu" SHA256SUMS.txt | awk '{print $1}')
+          sha_mac_x86=$(grep "x86_64-apple-darwin" SHA256SUMS.txt | awk '{print $1}')
+          sha_mac_arm=$(grep "aarch64-apple-darwin" SHA256SUMS.txt | awk '{print $1}')
+
+          sed \
+            -e "s/VERSION_PLACEHOLDER/${version}/g" \
+            -e "s/SHA256_LINUX_X86_64_PLACEHOLDER/${sha_linux_x86}/g" \
+            -e "s/SHA256_MAC_X86_64_PLACEHOLDER/${sha_mac_x86}/g" \
+            -e "s/SHA256_MAC_ARM64_PLACEHOLDER/${sha_mac_arm}/g" \
+            Formula/stellar-zk.rb > stellar-zk-updated.rb
+
+      - name: Push to Homebrew tap
+        uses: dmnemec/copy_file_to_another_repo_action@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        with:
+          source_file: stellar-zk-updated.rb
+          destination_repo: salazarsebas/homebrew-tap
+          destination_folder: Formula
+          destination_branch: main
+          rename: stellar-zk.rb
+          user_email: github-actions[bot]@users.noreply.github.com
+          user_name: github-actions[bot]
+          commit_message: "stellar-zk ${{ github.ref_name }}"

@@ -60,7 +60,7 @@ rzup install
 ## Installation
 
 ```bash
-git clone https://github.com/stellar-zk/stellar-zk.git
+git clone https://github.com/salazarsebas/stellar-zk.git
 cd stellar-zk
 cargo install --path crates/stellar-zk-cli
 ```

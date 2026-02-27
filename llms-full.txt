@@ -9,7 +9,7 @@
 - License: MIT OR Apache-2.0
 - MSRV: Rust 1.84.0
 - Edition: 2021
-- Repository: https://github.com/stellar-zk/stellar-zk
+- Repository: https://github.com/salazarsebas/stellar-zk
 
 stellar-zk is the ZK development toolkit for Stellar/Soroban. It orchestrates three proving systems (Groth16, UltraHonk, RISC Zero) optimized for Soroban smart contracts. Handles circuit compilation, trusted setup, proof generation, contract deployment, on-chain verification, and cost estimation. Built for Stellar Protocol 25 with native BN254 host functions (`g1_add`, `g1_mul`, `g1_neg`, `pairing_check`).
 
@@ -52,7 +52,7 @@ Only for Groth16 (per-circuit ceremony). stellar-zk auto-generates one in develo
 ## Installation
 
 ```
-git clone https://github.com/stellar-zk/stellar-zk.git
+git clone https://github.com/salazarsebas/stellar-zk.git
 cd stellar-zk
 cargo install --path crates/stellar-zk-cli
 ```

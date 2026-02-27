@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "RISC Zero backend for stellar-zk (zkVM + Groth16 wrapper)"
+repository.workspace = true
+homepage.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 stellar-zk-core.workspace = true

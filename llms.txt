@@ -77,7 +77,7 @@ stellar-zk call --contract-id CXYZ... --proof proofs/proof.bin --source alice
 ## Installation
 
 ```
-git clone https://github.com/stellar-zk/stellar-zk.git
+git clone https://github.com/salazarsebas/stellar-zk.git
 cd stellar-zk
 cargo install --path crates/stellar-zk-cli
 stellar-zk --help
@@ -101,7 +101,7 @@ stellar-zk --help
 
 ## Docs
 
-- [Full Technical Reference](https://github.com/stellar-zk/stellar-zk/blob/main/llms-full.txt): Types, serialization formats, contract API, cost models
-- [Usage Guide](https://github.com/stellar-zk/stellar-zk/blob/main/USAGE.md): Step-by-step tutorial from install to on-chain verification
-- [README](https://github.com/stellar-zk/stellar-zk/blob/main/README.md): Architecture, security model, configuration reference
-- [Contributing](https://github.com/stellar-zk/stellar-zk/blob/main/CONTRIBUTING.md): Development setup, code style, PR process
+- [Full Technical Reference](https://github.com/salazarsebas/stellar-zk/blob/main/llms-full.txt): Types, serialization formats, contract API, cost models
+- [Usage Guide](https://github.com/salazarsebas/stellar-zk/blob/main/USAGE.md): Step-by-step tutorial from install to on-chain verification
+- [README](https://github.com/salazarsebas/stellar-zk/blob/main/README.md): Architecture, security model, configuration reference
+- [Contributing](https://github.com/salazarsebas/stellar-zk/blob/main/CONTRIBUTING.md): Development setup, code style, PR process
