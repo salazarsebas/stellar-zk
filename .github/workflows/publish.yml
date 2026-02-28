@@ -33,9 +33,27 @@ jobs:
             echo "flag=" >> "$GITHUB_OUTPUT"
           fi
 
+      # Dry run: validate packaging
+      - name: Validate stellar-zk-core (dry run)
+        if: inputs.dry_run == true
+        run: cargo publish -p stellar-zk-core --dry-run
+
+      - name: Validate dependent crates metadata (dry run)
+        if: inputs.dry_run == true
+        run: |
+          # Dependent crates can't do full dry-run until core is on crates.io.
+          # Validate file lists and metadata instead. Build/test is covered by CI.
+          for crate in stellar-zk-groth16 stellar-zk-ultrahonk stellar-zk-risc0 stellar-zk; do
+            echo "--- $crate ---"
+            cargo package -p "$crate" --list
+            echo ""
+          done
+
+      # Real publish: tiered to respect dependency order
       # Tier 1: core (no internal deps)
       - name: Publish stellar-zk-core
-        run: cargo publish -p stellar-zk-core ${{ steps.flags.outputs.flag }}
+        if: inputs.dry_run == false
+        run: cargo publish -p stellar-zk-core
 
       - name: Wait for stellar-zk-core to be indexed
         if: inputs.dry_run == false
@@ -53,13 +71,16 @@ jobs:
 
       # Tier 2: backends (depend on core)
       - name: Publish stellar-zk-groth16
-        run: cargo publish -p stellar-zk-groth16 ${{ steps.flags.outputs.flag }}
+        if: inputs.dry_run == false
+        run: cargo publish -p stellar-zk-groth16
 
       - name: Publish stellar-zk-ultrahonk
-        run: cargo publish -p stellar-zk-ultrahonk ${{ steps.flags.outputs.flag }}
+        if: inputs.dry_run == false
+        run: cargo publish -p stellar-zk-ultrahonk
 
       - name: Publish stellar-zk-risc0
-        run: cargo publish -p stellar-zk-risc0 ${{ steps.flags.outputs.flag }}
+        if: inputs.dry_run == false
+        run: cargo publish -p stellar-zk-risc0
 
       - name: Wait for backend crates to be indexed
         if: inputs.dry_run == false
@@ -78,7 +99,8 @@ jobs:
 
       # Tier 3: CLI (depends on all)
       - name: Publish stellar-zk (CLI)
-        run: cargo publish -p stellar-zk ${{ steps.flags.outputs.flag }}
+        if: inputs.dry_run == false
+        run: cargo publish -p stellar-zk
 
       - name: Summary
         if: inputs.dry_run == false
