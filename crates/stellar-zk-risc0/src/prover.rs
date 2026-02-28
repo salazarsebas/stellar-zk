@@ -43,6 +43,11 @@ pub fn run_host(project_dir: &Path, input_path: &Path) -> Result<ReceiptOutput> 
                 "host binary failed: {stderr}"
             )));
         }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(StellarZkError::ProofGeneration(
+                "host binary not found — run `stellar-zk build` first".into(),
+            ));
+        }
         Err(e) => {
             return Err(StellarZkError::ProofGeneration(format!(
                 "failed to run host binary: {e}"
@@ -53,21 +58,17 @@ pub fn run_host(project_dir: &Path, input_path: &Path) -> Result<ReceiptOutput> 
     // Read output files
     let proof_dir = project_dir.join("proofs");
 
-    let seal = std::fs::read(proof_dir.join("seal.bin")).map_err(|e| {
-        StellarZkError::ProofGeneration(format!("failed to read seal.bin: {e}"))
-    })?;
+    let seal = std::fs::read(proof_dir.join("seal.bin"))
+        .map_err(|e| StellarZkError::ProofGeneration(format!("failed to read seal.bin: {e}")))?;
 
-    let journal = std::fs::read(proof_dir.join("journal.bin")).map_err(|e| {
-        StellarZkError::ProofGeneration(format!("failed to read journal.bin: {e}"))
-    })?;
+    let journal = std::fs::read(proof_dir.join("journal.bin"))
+        .map_err(|e| StellarZkError::ProofGeneration(format!("failed to read journal.bin: {e}")))?;
 
-    let image_id_hex = std::fs::read_to_string(proof_dir.join("image_id.hex"))
-        .map_err(|e| {
-            StellarZkError::ProofGeneration(format!("failed to read image_id.hex: {e}"))
-        })?;
-    let image_id_bytes = hex::decode(image_id_hex.trim()).map_err(|e| {
-        StellarZkError::ProofGeneration(format!("invalid image_id hex: {e}"))
+    let image_id_hex = std::fs::read_to_string(proof_dir.join("image_id.hex")).map_err(|e| {
+        StellarZkError::ProofGeneration(format!("failed to read image_id.hex: {e}"))
     })?;
+    let image_id_bytes = hex::decode(image_id_hex.trim())
+        .map_err(|e| StellarZkError::ProofGeneration(format!("invalid image_id hex: {e}")))?;
     if image_id_bytes.len() != 32 {
         return Err(StellarZkError::ProofGeneration(format!(
             "image_id must be 32 bytes, got {}",

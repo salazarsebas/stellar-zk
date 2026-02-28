@@ -10,7 +10,7 @@ stellar-zk is a CLI toolkit that lets you build, prove, and verify zero-knowledg
 
 ### All backends
 
-- **Rust 1.84.0+** — install via [rustup](https://rustup.rs/):
+- **Rust 1.85.0+** — install via [rustup](https://rustup.rs/):
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```

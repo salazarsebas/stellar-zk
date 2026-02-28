@@ -27,6 +27,10 @@ pub fn build_guest(guest_dir: &Path, target: &str) -> Result<()> {
                 "RISC Zero guest build failed: {stderr}"
             )))
         }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "cargo".into(),
+            install: "https://www.rust-lang.org/tools/install".into(),
+        }),
         Err(e) => Err(StellarZkError::CircuitCompilation(format!(
             "failed to run cargo for guest build: {e}"
         ))),
@@ -55,6 +59,10 @@ pub fn build_host(host_dir: &Path) -> Result<()> {
                 "RISC Zero host build failed: {stderr}"
             )))
         }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "cargo".into(),
+            install: "https://www.rust-lang.org/tools/install".into(),
+        }),
         Err(e) => Err(StellarZkError::CircuitCompilation(format!(
             "failed to run cargo for host build: {e}"
         ))),

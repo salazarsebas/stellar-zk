@@ -24,10 +24,7 @@ pub async fn run(
 ) -> Result<()> {
     output::print_header("stellar-zk estimate");
 
-    let project_dir = config_path
-        .parent()
-        .unwrap_or(Path::new("."))
-        .to_path_buf();
+    let project_dir = config_path.parent().unwrap_or(Path::new(".")).to_path_buf();
 
     // Try to load project config; fall back to defaults
     let backend_name = if config_path.exists() {

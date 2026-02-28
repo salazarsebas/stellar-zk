@@ -18,7 +18,7 @@ use std::path::Path;
 use async_trait::async_trait;
 
 use stellar_zk_core::backend::{
-    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, ZkBackend,
+    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, VersionWarning, ZkBackend,
 };
 use stellar_zk_core::config::{BackendConfig, ProjectConfig};
 use stellar_zk_core::error::Result;
@@ -54,6 +54,43 @@ impl ZkBackend for UltraHonkBackend {
         "Noir + UltraHonk (Barretenberg)"
     }
 
+    fn check_versions(&self) -> Vec<VersionWarning> {
+        use stellar_zk_core::version::{detect_version, Version};
+
+        let checks: &[(&str, Version)] = &[
+            (
+                "nargo",
+                Version {
+                    major: 0,
+                    minor: 36,
+                    patch: 0,
+                },
+            ),
+            (
+                "bb",
+                Version {
+                    major: 0,
+                    minor: 56,
+                    patch: 0,
+                },
+            ),
+        ];
+
+        let mut warnings = Vec::new();
+        for &(tool, min) in checks {
+            if let Some(found) = detect_version(tool) {
+                if found < min {
+                    warnings.push(VersionWarning {
+                        tool_name: tool.into(),
+                        found_version: found.to_string(),
+                        minimum_version: min.to_string(),
+                    });
+                }
+            }
+        }
+        warnings
+    }
+
     fn check_prerequisites(&self) -> std::result::Result<(), Vec<PrerequisiteError>> {
         let mut missing = Vec::new();
 
@@ -78,11 +115,7 @@ impl ZkBackend for UltraHonkBackend {
         }
     }
 
-    async fn init_project(
-        &self,
-        _project_dir: &Path,
-        _config: &ProjectConfig,
-    ) -> Result<()> {
+    async fn init_project(&self, _project_dir: &Path, _config: &ProjectConfig) -> Result<()> {
         Ok(())
     }
 
@@ -167,11 +200,7 @@ impl ZkBackend for UltraHonkBackend {
 
         // Step 3: Verify proof off-chain
         tracing::info!("verifying UltraHonk proof off-chain");
-        nargo::verify_ultrahonk(
-            &proof_path,
-            &build_artifacts.verification_key,
-            &oracle_hash,
-        )?;
+        nargo::verify_ultrahonk(&proof_path, &build_artifacts.verification_key, &oracle_hash)?;
         tracing::info!("off-chain verification passed");
 
         let proof_bytes = std::fs::read(&proof_path)?;
@@ -203,7 +232,10 @@ impl ZkBackend for UltraHonkBackend {
         _build_artifacts: &BuildArtifacts,
     ) -> Result<CostEstimate> {
         let num_inputs = proof_artifacts.public_inputs.len() as u32;
-        Ok(stellar_zk_core::estimator::static_estimate("ultrahonk", num_inputs))
+        Ok(stellar_zk_core::estimator::static_estimate(
+            "ultrahonk",
+            num_inputs,
+        ))
     }
 }
 

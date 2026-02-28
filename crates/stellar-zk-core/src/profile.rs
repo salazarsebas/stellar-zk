@@ -100,3 +100,39 @@ impl OptimizationProfile {
     /// Maximum CPU instructions per transaction (Soroban limit).
     pub const MAX_CPU_INSTRUCTIONS: u64 = 100_000_000;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_name_valid_profiles() {
+        assert!(OptimizationProfile::from_name("development").is_some());
+        assert!(OptimizationProfile::from_name("testnet").is_some());
+        assert!(OptimizationProfile::from_name("stellar-production").is_some());
+    }
+
+    #[test]
+    fn test_from_name_invalid() {
+        assert!(OptimizationProfile::from_name("invalid").is_none());
+        assert!(OptimizationProfile::from_name("").is_none());
+    }
+
+    #[test]
+    fn test_development_no_enforce_limits() {
+        let dev = OptimizationProfile::development();
+        assert!(!dev.enforce_size_limit);
+        assert!(!dev.enforce_cpu_limit);
+        assert!(dev.overflow_checks);
+    }
+
+    #[test]
+    fn test_production_enforces_all() {
+        let prod = OptimizationProfile::stellar_production();
+        assert!(prod.enforce_size_limit);
+        assert!(prod.enforce_cpu_limit);
+        assert!(prod.overflow_checks);
+        assert!(prod.lto);
+        assert!(prod.strip_symbols);
+    }
+}

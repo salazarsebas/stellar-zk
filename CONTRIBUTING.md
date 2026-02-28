@@ -21,7 +21,7 @@ cargo run -- --help
 
 ### Rust Version
 
-stellar-zk requires **Rust 1.84.0** or later. Install via [rustup](https://rustup.rs/).
+stellar-zk requires **Rust 1.85.0** or later. Install via [rustup](https://rustup.rs/).
 
 ## Running Tests
 
@@ -95,8 +95,8 @@ To add support for a new ZK proving system:
 
 1. Create a new crate: `crates/stellar-zk-<name>/`
 2. Implement the `ZkBackend` trait from `stellar-zk-core`
-3. Add circuit template to `templates/circuits/<name>/`
-4. Add contract template to `templates/contracts/<name>_verifier/`
+3. Add circuit template to `crates/stellar-zk-core/templates/circuits/<name>/`
+4. Add contract template to `crates/stellar-zk-core/templates/contracts/<name>_verifier/`
 5. Register `include_str!` constants in `crates/stellar-zk-core/src/templates/embedded.rs`
 6. Add variant to `BackendChoice` in `crates/stellar-zk-cli/src/main.rs`
 7. Add factory case in `crates/stellar-zk-cli/src/commands/init.rs::create_backend()`
@@ -116,4 +116,4 @@ For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same terms as the project: MIT OR Apache-2.0.
+By contributing, you agree that your contributions will be licensed under the MIT License.

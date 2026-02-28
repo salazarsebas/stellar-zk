@@ -84,12 +84,11 @@ pub struct Risc0Config {
 
 impl ProjectConfig {
     pub fn load(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path).map_err(|e| {
-            StellarZkError::ConfigNotFound {
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| StellarZkError::ConfigNotFound {
                 path: path.to_path_buf(),
                 source: e,
-            }
-        })?;
+            })?;
         serde_json::from_str(&contents).map_err(|e| StellarZkError::ConfigParse {
             path: path.to_path_buf(),
             source: e,
@@ -97,8 +96,8 @@ impl ProjectConfig {
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        let contents = serde_json::to_string_pretty(self)
-            .map_err(|e| StellarZkError::ConfigParse {
+        let contents =
+            serde_json::to_string_pretty(self).map_err(|e| StellarZkError::ConfigParse {
                 path: path.to_path_buf(),
                 source: e,
             })?;
@@ -140,12 +139,11 @@ impl ProjectConfig {
 
 impl BackendConfig {
     pub fn load(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path).map_err(|e| {
-            StellarZkError::ConfigNotFound {
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| StellarZkError::ConfigNotFound {
                 path: path.to_path_buf(),
                 source: e,
-            }
-        })?;
+            })?;
         serde_json::from_str(&contents).map_err(|e| StellarZkError::ConfigParse {
             path: path.to_path_buf(),
             source: e,
@@ -153,8 +151,8 @@ impl BackendConfig {
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        let contents = serde_json::to_string_pretty(self)
-            .map_err(|e| StellarZkError::ConfigParse {
+        let contents =
+            serde_json::to_string_pretty(self).map_err(|e| StellarZkError::ConfigParse {
                 path: path.to_path_buf(),
                 source: e,
             })?;
@@ -192,5 +190,80 @@ impl BackendConfig {
                 None
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_project_config_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("stellar-zk.config.json");
+        let config = ProjectConfig::default_for_backend("testproj", "groth16");
+        config.save(&path).unwrap();
+        let loaded = ProjectConfig::load(&path).unwrap();
+        assert_eq!(loaded.project_name, "testproj");
+        assert_eq!(loaded.backend, "groth16");
+        assert_eq!(loaded.profile, "development");
+    }
+
+    #[test]
+    fn test_backend_config_roundtrip_groth16() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("backend.config.json");
+        let config = BackendConfig::default_for_backend("groth16");
+        config.save(&path).unwrap();
+        let loaded = BackendConfig::load(&path).unwrap();
+        assert_eq!(loaded.backend, "groth16");
+        let g = loaded.groth16.unwrap();
+        assert_eq!(g.curve, "bn254");
+        assert_eq!(g.circuit_power, 14);
+        assert!(loaded.ultrahonk.is_none());
+        assert!(loaded.risc0.is_none());
+    }
+
+    #[test]
+    fn test_backend_config_roundtrip_ultrahonk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("backend.config.json");
+        let config = BackendConfig::default_for_backend("ultrahonk");
+        config.save(&path).unwrap();
+        let loaded = BackendConfig::load(&path).unwrap();
+        let uh = loaded.ultrahonk.unwrap();
+        assert_eq!(uh.oracle_hash, "keccak");
+        assert!(!uh.recursive);
+    }
+
+    #[test]
+    fn test_backend_config_roundtrip_risc0() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("backend.config.json");
+        let config = BackendConfig::default_for_backend("risc0");
+        config.save(&path).unwrap();
+        let loaded = BackendConfig::load(&path).unwrap();
+        let r0 = loaded.risc0.unwrap();
+        assert_eq!(r0.guest_target, "riscv32im-risc0-zkvm-elf");
+        assert!(r0.groth16_wrap);
+    }
+
+    #[test]
+    fn test_default_groth16_fields() {
+        let cfg = ProjectConfig::default_for_backend("myapp", "groth16");
+        assert_eq!(
+            cfg.circuit.entry_point,
+            PathBuf::from("circuits/main.circom")
+        );
+        assert_eq!(cfg.contract.name, "groth16_verifier");
+    }
+
+    #[test]
+    fn test_load_nonexistent_path() {
+        let result = ProjectConfig::load(Path::new("/tmp/nonexistent_stellar_zk_cfg.json"));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, StellarZkError::ConfigNotFound { .. }));
     }
 }

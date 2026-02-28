@@ -21,10 +21,7 @@ pub async fn run(
 ) -> Result<()> {
     output::print_header("stellar-zk build");
 
-    let project_dir = config_path
-        .parent()
-        .unwrap_or(Path::new("."))
-        .to_path_buf();
+    let project_dir = config_path.parent().unwrap_or(Path::new(".")).to_path_buf();
 
     let (project_config, backend_config) = project::load_project(&project_dir)?;
 
@@ -53,9 +50,20 @@ pub async fn run(
         anyhow::bail!("missing prerequisites");
     }
 
+    // Check versions
+    let version_warnings = backend.check_versions();
+    for w in &version_warnings {
+        output::print_warning(&format!(
+            "{}: found v{}, minimum v{} recommended",
+            w.tool_name, w.found_version, w.minimum_version
+        ));
+    }
+
     // Build
     output::print_step(1, 2, "Building circuit and contract...");
-    let artifacts = backend.build(&project_dir, &backend_config, &profile).await?;
+    let artifacts = backend
+        .build(&project_dir, &backend_config, &profile)
+        .await?;
 
     // Persist artifacts for prove/deploy/call/estimate
     output::print_step(2, 2, "Saving build artifacts...");

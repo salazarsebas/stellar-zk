@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 
 use stellar_zk_core::backend::{
-    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, ZkBackend,
+    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, VersionWarning, ZkBackend,
 };
 use stellar_zk_core::config::{BackendConfig, ProjectConfig};
 use stellar_zk_core::error::Result;
@@ -55,6 +55,33 @@ impl ZkBackend for Risc0Backend {
         "RISC Zero (zkVM)"
     }
 
+    fn check_versions(&self) -> Vec<VersionWarning> {
+        use stellar_zk_core::version::{detect_version, Version};
+
+        let checks: &[(&str, Version)] = &[(
+            "cargo-risczero",
+            Version {
+                major: 1,
+                minor: 0,
+                patch: 0,
+            },
+        )];
+
+        let mut warnings = Vec::new();
+        for &(tool, min) in checks {
+            if let Some(found) = detect_version(tool) {
+                if found < min {
+                    warnings.push(VersionWarning {
+                        tool_name: tool.into(),
+                        found_version: found.to_string(),
+                        minimum_version: min.to_string(),
+                    });
+                }
+            }
+        }
+        warnings
+    }
+
     fn check_prerequisites(&self) -> std::result::Result<(), Vec<PrerequisiteError>> {
         let mut missing = Vec::new();
 
@@ -62,8 +89,8 @@ impl ZkBackend for Risc0Backend {
         if which::which("cargo-risczero").is_err() {
             missing.push(PrerequisiteError {
                 tool_name: "cargo-risczero".into(),
-                install_instructions:
-                    "curl -L https://risczero.com/install | bash && rzup install".into(),
+                install_instructions: "curl -L https://risczero.com/install | bash && rzup install"
+                    .into(),
             });
         }
 
@@ -84,11 +111,7 @@ impl ZkBackend for Risc0Backend {
         }
     }
 
-    async fn init_project(
-        &self,
-        _project_dir: &Path,
-        _config: &ProjectConfig,
-    ) -> Result<()> {
+    async fn init_project(&self, _project_dir: &Path, _config: &ProjectConfig) -> Result<()> {
         Ok(())
     }
 
@@ -237,6 +260,8 @@ impl ZkBackend for Risc0Backend {
         _build_artifacts: &BuildArtifacts,
     ) -> Result<CostEstimate> {
         let num_inputs = proof_artifacts.public_inputs.len() as u32;
-        Ok(stellar_zk_core::estimator::static_estimate("risc0", num_inputs))
+        Ok(stellar_zk_core::estimator::static_estimate(
+            "risc0", num_inputs,
+        ))
     }
 }

@@ -37,7 +37,7 @@ Backends call external tools via `std::process::Command` instead of linking as R
 
 ### Template system
 
-Templates live in `templates/` and are embedded at compile-time via `include_str!` in `core/src/templates/embedded.rs`. They use Handlebars syntax (`{{contract_name}}`, `{{project_name}}`).
+Templates live in `crates/stellar-zk-core/templates/` and are embedded at compile-time via `include_str!` in `core/src/templates/embedded.rs`. They use Handlebars syntax (`{{contract_name}}`, `{{project_name}}`).
 
 ### Factory pattern
 
@@ -57,7 +57,7 @@ Templates live in `templates/` and are embedded at compile-time via `include_str
 ## Do NOT
 
 - Do NOT add heavy dependencies (`risc0-zkvm`, `ark-circom`, `wasmer`)
-- Do NOT modify templates in `templates/` without updating `embedded.rs`
+- Do NOT modify templates in `crates/stellar-zk-core/templates/` without updating `embedded.rs`
 - Do NOT change byte order in serializers without updating BOTH the serializer AND the contract template
 - Do NOT use `ark-circom` (depends on `wasmer-wasix`, broken on Rust 1.84+)
 - Do NOT break the artifact chain (`build_artifacts.json`)
@@ -67,10 +67,10 @@ Templates live in `templates/` and are embedded at compile-time via `include_str
 
 These files are tightly coupled and must be updated together:
 
-- `templates/**/*.tmpl` <-> `crates/stellar-zk-core/src/templates/embedded.rs`
-- `groth16/src/serializer.rs` <-> `templates/contracts/groth16_verifier/src/lib.rs.tmpl`
-- `ultrahonk/src/serializer.rs` <-> `templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl`
-- `risc0/src/serializer.rs` <-> `templates/contracts/risc0_verifier/src/lib.rs.tmpl`
+- `crates/stellar-zk-core/templates/**/*.tmpl` <-> `crates/stellar-zk-core/src/templates/embedded.rs`
+- `groth16/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/groth16_verifier/src/lib.rs.tmpl`
+- `ultrahonk/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl`
+- `risc0/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/risc0_verifier/src/lib.rs.tmpl`
 - `cli/src/main.rs` (BackendChoice) <-> `cli/src/commands/init.rs` (create_backend) <-> `core/src/config.rs` (BackendConfig)
 
 ## Code Style

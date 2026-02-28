@@ -8,6 +8,7 @@ description = "Core library for stellar-zk: traits, config, pipeline, templates"
 repository.workspace = true
 homepage.workspace = true
 readme = "../../README.md"
+include = ["src/**/*", "templates/**/*", "Cargo.toml"]
 
 [dependencies]
 serde.workspace = true
@@ -20,3 +21,6 @@ async-trait.workspace = true
 
 handlebars = "6.0"
 which = "7.0"
+
+[dev-dependencies]
+tempfile = "3.10"

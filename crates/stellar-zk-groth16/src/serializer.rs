@@ -7,8 +7,7 @@ use num_traits::Num;
 /// Soroban's BN254 host functions expect 32-byte big-endian byte arrays, left-padded
 /// with zeros. This function performs that conversion.
 fn decimal_to_be_bytes(s: &str) -> Result<[u8; 32], String> {
-    let n = BigUint::from_str_radix(s, 10)
-        .map_err(|e| format!("invalid decimal: {s}: {e}"))?;
+    let n = BigUint::from_str_radix(s, 10).map_err(|e| format!("invalid decimal: {s}: {e}"))?;
     let be_bytes = n.to_bytes_be();
     if be_bytes.len() > 32 {
         return Err(format!("value too large for 32 bytes: {s}"));
@@ -150,9 +149,7 @@ pub fn serialize_vk_from_snarkjs(vk_json: &serde_json::Value) -> Result<Vec<u8>,
     let delta = vk_json["vk_delta_2"]
         .as_array()
         .ok_or("vk.vk_delta_2 must be an array")?;
-    let ic = vk_json["IC"]
-        .as_array()
-        .ok_or("vk.IC must be an array")?;
+    let ic = vk_json["IC"].as_array().ok_or("vk.IC must be an array")?;
 
     let alpha_bytes = serialize_g1_from_json(alpha)?;
     let beta_bytes = serialize_g2_from_json(beta)?;
@@ -244,9 +241,9 @@ mod tests {
         let bytes = serialize_g2_from_json(coords.as_array().unwrap()).unwrap();
         assert_eq!(bytes.len(), 128);
         // Soroban order: x_c1 | x_c0 | y_c1 | y_c0
-        assert_eq!(bytes[31], 20);  // x_c1
-        assert_eq!(bytes[63], 10);  // x_c0
-        assert_eq!(bytes[95], 40);  // y_c1
+        assert_eq!(bytes[31], 20); // x_c1
+        assert_eq!(bytes[63], 10); // x_c0
+        assert_eq!(bytes[95], 40); // y_c1
         assert_eq!(bytes[127], 30); // y_c0
     }
 
@@ -262,16 +259,16 @@ mod tests {
         let bytes = serialize_proof_from_snarkjs(&proof).unwrap();
         assert_eq!(bytes.len(), 256);
         // A starts at 0
-        assert_eq!(bytes[31], 1);   // A.x
-        assert_eq!(bytes[63], 2);   // A.y
-        // B starts at 64 (G2: c1|c0|c1|c0)
-        assert_eq!(bytes[95], 4);   // B.x_c1
-        assert_eq!(bytes[127], 3);  // B.x_c0
-        assert_eq!(bytes[159], 6);  // B.y_c1
-        assert_eq!(bytes[191], 5);  // B.y_c0
-        // C starts at 192
-        assert_eq!(bytes[223], 7);  // C.x
-        assert_eq!(bytes[255], 8);  // C.y
+        assert_eq!(bytes[31], 1); // A.x
+        assert_eq!(bytes[63], 2); // A.y
+                                  // B starts at 64 (G2: c1|c0|c1|c0)
+        assert_eq!(bytes[95], 4); // B.x_c1
+        assert_eq!(bytes[127], 3); // B.x_c0
+        assert_eq!(bytes[159], 6); // B.y_c1
+        assert_eq!(bytes[191], 5); // B.y_c0
+                                   // C starts at 192
+        assert_eq!(bytes[223], 7); // C.x
+        assert_eq!(bytes[255], 8); // C.y
     }
 
     #[test]
@@ -321,5 +318,64 @@ mod tests {
         assert_eq!(bytes.len(), 32);
         // Should not be all zeros
         assert!(!bytes.iter().all(|&b| b == 0));
+    }
+
+    // --- Edge case tests ---
+
+    #[test]
+    fn test_decimal_overflow_exceeds_32_bytes() {
+        // 2^256 = 115792089237316195423570985008687907853269984665640564039457584007913129639936
+        let too_large =
+            "115792089237316195423570985008687907853269984665640564039457584007913129639936";
+        let result = decimal_to_be_bytes(too_large);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too large"));
+    }
+
+    #[test]
+    fn test_decimal_invalid_input() {
+        assert!(decimal_to_be_bytes("not_a_number").is_err());
+        assert!(decimal_to_be_bytes("").is_err());
+        assert!(decimal_to_be_bytes("-1").is_err());
+    }
+
+    #[test]
+    fn test_g1_empty_coords() {
+        let coords: Vec<serde_json::Value> = vec![];
+        let result = serialize_g1_from_json(&coords);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_g2_non_array_components() {
+        // G2 expects arrays for x and y, not plain strings
+        let coords = serde_json::json!(["10", "20", "1"]);
+        let result = serialize_g2_from_json(coords.as_array().unwrap());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_proof_missing_field() {
+        let proof = serde_json::json!({
+            "pi_a": ["1", "2", "1"],
+            // pi_b missing
+            "pi_c": ["7", "8", "1"],
+        });
+        let result = serialize_proof_from_snarkjs(&proof);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_public_inputs_empty_array() {
+        let inputs = serde_json::json!([]);
+        let result = serialize_public_inputs_from_snarkjs(&inputs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_public_inputs_non_string_element() {
+        let inputs = serde_json::json!([42]);
+        let result = serialize_public_inputs_from_snarkjs(&inputs);
+        assert!(result.is_err());
     }
 }

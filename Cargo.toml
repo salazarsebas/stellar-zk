@@ -11,8 +11,8 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
-rust-version = "1.84.0"
+license = "MIT"
+rust-version = "1.85.0"
 repository = "https://github.com/salazarsebas/stellar-zk"
 homepage = "https://github.com/salazarsebas/stellar-zk"
 keywords = ["stellar", "soroban", "zk", "groth16", "zero-knowledge"]

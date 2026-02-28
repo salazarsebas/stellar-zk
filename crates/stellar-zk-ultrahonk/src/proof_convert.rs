@@ -106,4 +106,13 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], [0x11; 32]);
     }
+
+    #[test]
+    fn test_extract_public_inputs_max_count_small_buffer() {
+        // count = u32::MAX but buffer is tiny — must not panic or overflow
+        let data = vec![0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00];
+        let result = extract_public_inputs(&data);
+        // Buffer too small for any complete 32-byte input
+        assert!(result.is_empty());
+    }
 }

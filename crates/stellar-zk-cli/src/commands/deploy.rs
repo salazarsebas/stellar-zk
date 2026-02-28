@@ -13,24 +13,16 @@ use crate::NetworkChoice;
 /// Uploads the compiled WASM, deploys the contract, and initializes it with
 /// the verification key via the `__constructor`. Returns the contract ID for
 /// subsequent `call` invocations.
-pub async fn run(
-    config_path: &Path,
-    network: &NetworkChoice,
-    source: &str,
-) -> Result<()> {
+pub async fn run(config_path: &Path, network: &NetworkChoice, source: &str) -> Result<()> {
     output::print_header("stellar-zk deploy");
 
-    let project_dir = config_path
-        .parent()
-        .unwrap_or(Path::new("."))
-        .to_path_buf();
+    let project_dir = config_path.parent().unwrap_or(Path::new(".")).to_path_buf();
 
     let (project_config, _) = project::load_project(&project_dir)?;
 
     // Load build artifacts to find WASM and VK paths
-    let build_artifacts =
-        stellar_zk_core::artifacts::load(&project_dir.join("target"))
-            .map_err(|_| anyhow::anyhow!("build artifacts not found — run `stellar-zk build` first"))?;
+    let build_artifacts = stellar_zk_core::artifacts::load(&project_dir.join("target"))
+        .map_err(|_| anyhow::anyhow!("build artifacts not found — run `stellar-zk build` first"))?;
 
     let wasm_path = &build_artifacts.verifier_wasm;
     if !wasm_path.exists() {

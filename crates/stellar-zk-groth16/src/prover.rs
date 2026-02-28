@@ -82,11 +82,7 @@ pub fn generate_keys(
 /// Generate witness from circuit WASM and input JSON.
 ///
 /// Uses Node.js to run the circom-generated witness calculator.
-pub fn generate_witness(
-    wasm_path: &Path,
-    input_path: &Path,
-    witness_output: &Path,
-) -> Result<()> {
+pub fn generate_witness(wasm_path: &Path, input_path: &Path, witness_output: &Path) -> Result<()> {
     // snarkjs wtns calculate
     run_snarkjs(&[
         "wtns",
@@ -120,19 +116,17 @@ pub fn generate_proof(
 
     // Parse and serialize proof
     let proof_str = std::fs::read_to_string(proof_json_output)?;
-    let proof_json: serde_json::Value = serde_json::from_str(&proof_str).map_err(|e| {
-        StellarZkError::ProofGeneration(format!("failed to parse proof.json: {e}"))
-    })?;
+    let proof_json: serde_json::Value = serde_json::from_str(&proof_str)
+        .map_err(|e| StellarZkError::ProofGeneration(format!("failed to parse proof.json: {e}")))?;
 
     let proof_bytes = serializer::serialize_proof_from_snarkjs(&proof_json)
         .map_err(|e| StellarZkError::ProofGeneration(format!("proof serialization: {e}")))?;
 
     // Parse and serialize public inputs
     let public_str = std::fs::read_to_string(public_json_output)?;
-    let public_json: serde_json::Value =
-        serde_json::from_str(&public_str).map_err(|e| {
-            StellarZkError::ProofGeneration(format!("failed to parse public.json: {e}"))
-        })?;
+    let public_json: serde_json::Value = serde_json::from_str(&public_str).map_err(|e| {
+        StellarZkError::ProofGeneration(format!("failed to parse public.json: {e}"))
+    })?;
 
     let public_inputs = serializer::serialize_public_inputs_from_snarkjs(&public_json)
         .map_err(|e| StellarZkError::ProofGeneration(format!("public input serialization: {e}")))?;
@@ -158,9 +152,7 @@ pub fn convert_vk_to_soroban(vk_json_path: &Path, vk_bin_output: &Path) -> Resul
 fn run_snarkjs(args: &[&str]) -> Result<String> {
     tracing::debug!("snarkjs {}", args.join(" "));
 
-    let output = Command::new("snarkjs")
-        .args(args)
-        .output();
+    let output = Command::new("snarkjs").args(args).output();
 
     match output {
         Ok(out) if out.status.success() => {
@@ -175,12 +167,10 @@ fn run_snarkjs(args: &[&str]) -> Result<String> {
                 args.first().unwrap_or(&"")
             )))
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Err(StellarZkError::MissingTool {
-                name: "snarkjs".into(),
-                install: "npm install -g snarkjs".into(),
-            })
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "snarkjs".into(),
+            install: "npm install -g snarkjs".into(),
+        }),
         Err(e) => Err(StellarZkError::ProofGeneration(format!(
             "failed to run snarkjs: {e}"
         ))),

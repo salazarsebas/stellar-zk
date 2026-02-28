@@ -85,7 +85,9 @@ pub async fn run(
         }
     }
 
-    output::print_success(&format!("Project '{name}' created with {backend_name} backend"));
+    output::print_success(&format!(
+        "Project '{name}' created with {backend_name} backend"
+    ));
     println!();
     println!("  Next steps:");
     println!("    cd {name}");
@@ -153,10 +155,7 @@ fn write_contract_templates(
             embedded::ULTRAHONK_CONTRACT_CARGO,
             embedded::ULTRAHONK_CONTRACT_LIB,
         ),
-        "risc0" => (
-            embedded::RISC0_CONTRACT_CARGO,
-            embedded::RISC0_CONTRACT_LIB,
-        ),
+        "risc0" => (embedded::RISC0_CONTRACT_CARGO, embedded::RISC0_CONTRACT_LIB),
         _ => return Ok(()),
     };
 
@@ -176,17 +175,12 @@ fn write_contract_templates(
 }
 
 fn write_input_template(project_dir: &Path) -> Result<()> {
-    std::fs::write(
-        project_dir.join("inputs/input.json"),
-        embedded::INPUT_JSON,
-    )?;
+    std::fs::write(project_dir.join("inputs/input.json"), embedded::INPUT_JSON)?;
     Ok(())
 }
 
 /// Create the appropriate backend implementation.
-pub fn create_backend(
-    name: &str,
-) -> Result<Box<dyn stellar_zk_core::backend::ZkBackend>> {
+pub fn create_backend(name: &str) -> Result<Box<dyn stellar_zk_core::backend::ZkBackend>> {
     match name {
         "groth16" => Ok(Box::new(stellar_zk_groth16::Groth16Backend::new())),
         "ultrahonk" => Ok(Box::new(stellar_zk_ultrahonk::UltraHonkBackend::new())),

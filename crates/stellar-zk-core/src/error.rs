@@ -7,7 +7,6 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum StellarZkError {
     // --- Configuration ---
-
     /// The configuration file (`stellar-zk.config.json` or `backend.config.json`) was not found.
     #[error("config file not found at {path}")]
     ConfigNotFound {
@@ -33,13 +32,11 @@ pub enum StellarZkError {
     UnknownProfile(String),
 
     // --- Prerequisites ---
-
     /// A required external tool (e.g., `circom`, `snarkjs`, `nargo`) is not installed.
     #[error("required tool '{name}' not found — install: {install}")]
     MissingTool { name: String, install: String },
 
     // --- Build ---
-
     /// The ZK circuit failed to compile (e.g., Circom syntax error, Noir type error).
     #[error("circuit compilation failed: {0}")]
     CircuitCompilation(String),
@@ -54,14 +51,9 @@ pub enum StellarZkError {
 
     /// The compiled WASM exceeds Soroban's size limit (64KB for production).
     #[error("WASM too large: {size} bytes (max {max}) at {path}")]
-    WasmTooLarge {
-        size: u64,
-        max: u64,
-        path: PathBuf,
-    },
+    WasmTooLarge { size: u64, max: u64, path: PathBuf },
 
     // --- Proof ---
-
     /// Proof generation failed (witness computation, proving, or serialization).
     #[error("proof generation failed: {0}")]
     ProofGeneration(String),
@@ -71,7 +63,6 @@ pub enum StellarZkError {
     InputNotFound(PathBuf),
 
     // --- Stellar CLI ---
-
     /// An error occurred while invoking the `stellar` CLI tool.
     #[error("stellar CLI error: {0}")]
     StellarCli(String),
@@ -81,13 +72,11 @@ pub enum StellarZkError {
     DeployFailed(String),
 
     // --- Templates ---
-
     /// Handlebars template rendering failed (invalid template or missing variables).
     #[error("template rendering failed: {0}")]
     TemplateRender(String),
 
     // --- Project ---
-
     /// Attempted to create a project in a directory that already exists.
     #[error("project directory already exists: {0}")]
     ProjectExists(PathBuf),
@@ -97,7 +86,6 @@ pub enum StellarZkError {
     NotAProject,
 
     // --- General ---
-
     /// A filesystem I/O error.
     #[error(transparent)]
     Io(#[from] std::io::Error),

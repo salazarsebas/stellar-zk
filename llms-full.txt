@@ -6,8 +6,8 @@
 
 - Name: stellar-zk
 - Version: 0.1.0
-- License: MIT OR Apache-2.0
-- MSRV: Rust 1.84.0
+- License: MIT
+- MSRV: Rust 1.85.0
 - Edition: 2021
 - Repository: https://github.com/salazarsebas/stellar-zk
 
@@ -57,7 +57,7 @@ cd stellar-zk
 cargo install --path crates/stellar-zk-cli
 ```
 
-Requirements: Rust 1.84.0+, Stellar CLI (for deploy/call).
+Requirements: Rust 1.85.0+, Stellar CLI (for deploy/call).
 
 ## CLI Reference
 
@@ -699,7 +699,7 @@ RISC Zero:
 ## Prerequisites
 
 ### All backends
-- Rust 1.84.0+: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+- Rust 1.85.0+: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 - Stellar CLI: https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli
 
 ### Groth16
@@ -719,31 +719,31 @@ RISC Zero:
 
 ### How it works
 
-Templates live in `templates/` and are embedded into the binary at compile time via `include_str!` macros in `crates/stellar-zk-core/src/templates/embedded.rs`.
+Templates live in `crates/stellar-zk-core/templates/` and are embedded into the binary at compile time via `include_str!` macros in `crates/stellar-zk-core/src/templates/embedded.rs`.
 
 At runtime, Handlebars renders the templates with project-specific variables (e.g., `{{contract_name}}`).
 
 ### Embedded constants (embedded.rs)
 
 Circuit/program templates:
-  GROTH16_CIRCUIT          templates/circuits/groth16/example.circom
-  ULTRAHONK_CIRCUIT        templates/circuits/ultrahonk/src/main.nr
-  ULTRAHONK_NARGO_TOML     templates/circuits/ultrahonk/Nargo.toml
-  RISC0_HOST               templates/circuits/risc0/host/src/main.rs
-  RISC0_GUEST              templates/circuits/risc0/guest/src/main.rs
-  RISC0_GUEST_CARGO_TOML   templates/circuits/risc0/guest/Cargo.toml
-  RISC0_HOST_CARGO_TOML    templates/circuits/risc0/host/Cargo.toml
+  GROTH16_CIRCUIT          crates/stellar-zk-core/templates/circuits/groth16/example.circom
+  ULTRAHONK_CIRCUIT        crates/stellar-zk-core/templates/circuits/ultrahonk/src/main.nr
+  ULTRAHONK_NARGO_TOML     crates/stellar-zk-core/templates/circuits/ultrahonk/Nargo.toml
+  RISC0_HOST               crates/stellar-zk-core/templates/circuits/risc0/host/src/main.rs
+  RISC0_GUEST              crates/stellar-zk-core/templates/circuits/risc0/guest/src/main.rs
+  RISC0_GUEST_CARGO_TOML   crates/stellar-zk-core/templates/circuits/risc0/guest/Cargo.toml
+  RISC0_HOST_CARGO_TOML    crates/stellar-zk-core/templates/circuits/risc0/host/Cargo.toml
 
 Contract templates:
-  GROTH16_CONTRACT_CARGO   templates/contracts/groth16_verifier/Cargo.toml.tmpl
-  GROTH16_CONTRACT_LIB     templates/contracts/groth16_verifier/src/lib.rs.tmpl
-  ULTRAHONK_CONTRACT_CARGO templates/contracts/ultrahonk_verifier/Cargo.toml.tmpl
-  ULTRAHONK_CONTRACT_LIB   templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl
-  RISC0_CONTRACT_CARGO     templates/contracts/risc0_verifier/Cargo.toml.tmpl
-  RISC0_CONTRACT_LIB       templates/contracts/risc0_verifier/src/lib.rs.tmpl
+  GROTH16_CONTRACT_CARGO   crates/stellar-zk-core/templates/contracts/groth16_verifier/Cargo.toml.tmpl
+  GROTH16_CONTRACT_LIB     crates/stellar-zk-core/templates/contracts/groth16_verifier/src/lib.rs.tmpl
+  ULTRAHONK_CONTRACT_CARGO crates/stellar-zk-core/templates/contracts/ultrahonk_verifier/Cargo.toml.tmpl
+  ULTRAHONK_CONTRACT_LIB   crates/stellar-zk-core/templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl
+  RISC0_CONTRACT_CARGO     crates/stellar-zk-core/templates/contracts/risc0_verifier/Cargo.toml.tmpl
+  RISC0_CONTRACT_LIB       crates/stellar-zk-core/templates/contracts/risc0_verifier/src/lib.rs.tmpl
 
 Config templates:
-  INPUT_JSON               templates/config/input.json.tmpl
+  INPUT_JSON               crates/stellar-zk-core/templates/config/input.json.tmpl
 
 ### Handlebars variables
 
@@ -808,7 +808,7 @@ stellar-zk/
 ├── CONTRIBUTING.md                       # Contributor guide
 ├── ROADMAP.md                            # Development roadmap
 ├── CHANGELOG.md                          # Version history
-├── LICENSE-MIT / LICENSE-APACHE           # Dual license
+├── LICENSE                               # MIT license
 ├── llms.txt                              # LLM summary (this project)
 ├── llms-full.txt                         # LLM full reference (this file)
 ├── crates/
@@ -845,20 +845,20 @@ stellar-zk/
 │   │   ├── nargo.rs                      # nargo + bb wrappers
 │   │   ├── proof_convert.rs              # Public input extraction
 │   │   └── serializer.rs                # Proof format utilities
-│   └── stellar-zk-risc0/src/
-│       ├── lib.rs                        # Risc0Backend impl
-│       ├── guest.rs                      # Guest ELF + host build
-│       ├── prover.rs                     # Host binary execution
-│       └── serializer.rs                # Seal validation (5 tests)
-└── templates/
-    ├── circuits/
-    │   ├── groth16/example.circom
-    │   ├── ultrahonk/  (Nargo.toml + src/main.nr)
-    │   └── risc0/      (guest/ + host/)
-    ├── contracts/
-    │   ├── groth16_verifier/   (Cargo.toml.tmpl + src/lib.rs.tmpl)
-    │   ├── ultrahonk_verifier/ (Cargo.toml.tmpl + src/lib.rs.tmpl)
-    │   └── risc0_verifier/     (Cargo.toml.tmpl + src/lib.rs.tmpl)
-    └── config/
-        └── input.json.tmpl
+│   ├── stellar-zk-risc0/src/
+│   │   ├── lib.rs                        # Risc0Backend impl
+│   │   ├── guest.rs                      # Guest ELF + host build
+│   │   ├── prover.rs                     # Host binary execution
+│   │   └── serializer.rs                # Seal validation (5 tests)
+│   └── stellar-zk-core/templates/        # Embedded via include_str!
+│       ├── circuits/
+│       │   ├── groth16/example.circom
+│       │   ├── ultrahonk/  (Nargo.toml + src/main.nr)
+│       │   └── risc0/      (guest/ + host/)
+│       ├── contracts/
+│       │   ├── groth16_verifier/   (Cargo.toml.tmpl + src/lib.rs.tmpl)
+│       │   ├── ultrahonk_verifier/ (Cargo.toml.tmpl + src/lib.rs.tmpl)
+│       │   └── risc0_verifier/     (Cargo.toml.tmpl + src/lib.rs.tmpl)
+│       └── config/
+│           └── input.json.tmpl
 ```

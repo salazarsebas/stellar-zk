@@ -35,6 +35,10 @@ pub fn execute(project_dir: &Path) -> Result<()> {
         Ok(out) => Err(StellarZkError::ProofGeneration(
             String::from_utf8_lossy(&out.stderr).to_string(),
         )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "nargo".into(),
+            install: "noirup".into(),
+        }),
         Err(e) => Err(StellarZkError::ProofGeneration(e.to_string())),
     }
 }
@@ -65,11 +69,7 @@ pub fn write_vk(acir_path: &Path, output_path: &Path, oracle_hash: &str) -> Resu
 }
 
 /// Verify an UltraHonk proof using bb (off-chain).
-pub fn verify_ultrahonk(
-    proof_path: &Path,
-    vk_path: &Path,
-    oracle_hash: &str,
-) -> Result<()> {
+pub fn verify_ultrahonk(proof_path: &Path, vk_path: &Path, oracle_hash: &str) -> Result<()> {
     let output = Command::new("bb")
         .arg("verify_ultra_honk")
         .arg("--oracle_hash")
@@ -118,6 +118,10 @@ pub fn prove_ultrahonk(
         Ok(out) => Err(StellarZkError::ProofGeneration(
             String::from_utf8_lossy(&out.stderr).to_string(),
         )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "bb".into(),
+            install: "bbup".into(),
+        }),
         Err(e) => Err(StellarZkError::ProofGeneration(e.to_string())),
     }
 }

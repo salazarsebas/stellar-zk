@@ -18,7 +18,7 @@ use std::path::Path;
 use async_trait::async_trait;
 
 use stellar_zk_core::backend::{
-    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, ZkBackend,
+    BuildArtifacts, CostEstimate, PrerequisiteError, ProofArtifacts, VersionWarning, ZkBackend,
 };
 use stellar_zk_core::config::{BackendConfig, ProjectConfig};
 use stellar_zk_core::error::Result;
@@ -54,14 +54,58 @@ impl ZkBackend for Groth16Backend {
         "Groth16 (Circom + snarkjs)"
     }
 
+    fn check_versions(&self) -> Vec<VersionWarning> {
+        use stellar_zk_core::version::{detect_version, Version};
+
+        let checks: &[(&str, Version)] = &[
+            (
+                "circom",
+                Version {
+                    major: 2,
+                    minor: 1,
+                    patch: 0,
+                },
+            ),
+            (
+                "snarkjs",
+                Version {
+                    major: 0,
+                    minor: 7,
+                    patch: 0,
+                },
+            ),
+            (
+                "node",
+                Version {
+                    major: 18,
+                    minor: 0,
+                    patch: 0,
+                },
+            ),
+        ];
+
+        let mut warnings = Vec::new();
+        for &(tool, min) in checks {
+            if let Some(found) = detect_version(tool) {
+                if found < min {
+                    warnings.push(VersionWarning {
+                        tool_name: tool.into(),
+                        found_version: found.to_string(),
+                        minimum_version: min.to_string(),
+                    });
+                }
+            }
+        }
+        warnings
+    }
+
     fn check_prerequisites(&self) -> std::result::Result<(), Vec<PrerequisiteError>> {
         let mut missing = Vec::new();
 
         if which::which("circom").is_err() {
             missing.push(PrerequisiteError {
                 tool_name: "circom".into(),
-                install_instructions:
-                    "https://docs.circom.io/getting-started/installation/".into(),
+                install_instructions: "https://docs.circom.io/getting-started/installation/".into(),
             });
         }
 
@@ -86,11 +130,7 @@ impl ZkBackend for Groth16Backend {
         }
     }
 
-    async fn init_project(
-        &self,
-        _project_dir: &Path,
-        _config: &ProjectConfig,
-    ) -> Result<()> {
+    async fn init_project(&self, _project_dir: &Path, _config: &ProjectConfig) -> Result<()> {
         // Project scaffolding is handled by the CLI init command
         // using embedded templates. This method is for any
         // backend-specific post-init setup.
@@ -202,14 +242,11 @@ impl ZkBackend for Groth16Backend {
         prover::generate_witness(&witness_wasm, input_path, &witness_path)?;
 
         // Step 2: Generate proof
-        let zkey_path = build_artifacts
-            .proving_key
-            .as_ref()
-            .ok_or_else(|| {
-                stellar_zk_core::error::StellarZkError::ProofGeneration(
-                    "zkey path not set — run 'stellar-zk build' first".into(),
-                )
-            })?;
+        let zkey_path = build_artifacts.proving_key.as_ref().ok_or_else(|| {
+            stellar_zk_core::error::StellarZkError::ProofGeneration(
+                "zkey path not set — run 'stellar-zk build' first".into(),
+            )
+        })?;
 
         let proof_json_path = proof_dir.join("proof.json");
         let public_json_path = proof_dir.join("public.json");
@@ -253,8 +290,7 @@ impl ZkBackend for Groth16Backend {
     ) -> Result<CostEstimate> {
         let num_inputs = proof_artifacts.public_inputs.len() as u32;
         Ok(stellar_zk_core::estimator::static_estimate(
-            "groth16",
-            num_inputs,
+            "groth16", num_inputs,
         ))
     }
 }

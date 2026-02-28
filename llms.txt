@@ -70,9 +70,9 @@ stellar-zk call --contract-id CXYZ... --proof proofs/proof.bin --source alice
 - **Soroban limits**: 64 KB WASM, 100M CPU instructions per transaction
 - Groth16 verification fits in ~12M CPU instructions (~12% of budget)
 - All contracts include anti-replay protection via SHA256 nullifiers
-- Built in Rust, MIT/Apache-2.0 licensed, no heavy dependencies
+- Built in Rust, MIT licensed, no heavy dependencies
 - Installation: `cargo install --path crates/stellar-zk-cli` (from source)
-- Requirements: Rust 1.84+, Stellar CLI, backend-specific tools (circom+snarkjs, nargo+bb, or cargo-risczero)
+- Requirements: Rust 1.85+, Stellar CLI, backend-specific tools (circom+snarkjs, nargo+bb, or cargo-risczero)
 
 ## Installation
 

@@ -107,10 +107,8 @@ fn estimate_fee(cpu_instructions: u64) -> u64 {
 /// Format a cost estimate as a human-readable report.
 pub fn format_estimate(estimate: &CostEstimate, backend: &str) -> String {
     let cpu_pct =
-        estimate.cpu_instructions as f64 / OptimizationProfile::MAX_CPU_INSTRUCTIONS as f64
-            * 100.0;
-    let wasm_pct =
-        estimate.wasm_size as f64 / OptimizationProfile::MAX_WASM_SIZE as f64 * 100.0;
+        estimate.cpu_instructions as f64 / OptimizationProfile::MAX_CPU_INSTRUCTIONS as f64 * 100.0;
+    let wasm_pct = estimate.wasm_size as f64 / OptimizationProfile::MAX_WASM_SIZE as f64 * 100.0;
 
     let cpu_status = if cpu_pct > 100.0 {
         "FAIL"
@@ -188,5 +186,45 @@ fn format_bytes(n: u64) -> String {
         format!("{:.1} KB", n as f64 / 1024.0)
     } else {
         format!("{n} B")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_groth16_base_cost() {
+        let est = static_estimate("groth16", 0);
+        assert_eq!(est.cpu_instructions, 10_000_000);
+    }
+
+    #[test]
+    fn test_groth16_scaling_with_inputs() {
+        let est0 = static_estimate("groth16", 0);
+        let est5 = static_estimate("groth16", 5);
+        assert_eq!(est5.cpu_instructions, est0.cpu_instructions + 5 * 500_000);
+    }
+
+    #[test]
+    fn test_groth16_warning_above_70_percent() {
+        // Need enough inputs to push above 70M CPU (70% of 100M)
+        // 10M base + N*0.5M > 70M → N > 120
+        let est = static_estimate("groth16", 130);
+        assert!(est.warnings.iter().any(|w| w.contains("70%")));
+    }
+
+    #[test]
+    fn test_unknown_backend() {
+        let est = static_estimate("plonky2", 0);
+        assert_eq!(est.cpu_instructions, 0);
+        assert!(est.warnings.iter().any(|w| w.contains("unknown backend")));
+    }
+
+    #[test]
+    fn test_format_estimate_contains_backend() {
+        let est = static_estimate("groth16", 1);
+        let report = format_estimate(&est, "groth16");
+        assert!(report.contains("groth16"));
     }
 }

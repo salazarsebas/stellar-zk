@@ -37,9 +37,19 @@ jobs:
       - name: Publish stellar-zk-core
         run: cargo publish -p stellar-zk-core ${{ steps.flags.outputs.flag }}
 
-      - name: Wait for crates.io index
+      - name: Wait for stellar-zk-core to be indexed
         if: inputs.dry_run == false
-        run: sleep 30
+        run: |
+          echo "Waiting for stellar-zk-core to appear in crates.io index..."
+          for i in $(seq 1 30); do
+            if cargo search stellar-zk-core 2>/dev/null | grep -q "^stellar-zk-core "; then
+              echo "stellar-zk-core is indexed."
+              exit 0
+            fi
+            echo "Attempt $i/30 — not yet indexed, waiting 10s..."
+            sleep 10
+          done
+          echo "Timed out waiting for index. Proceeding anyway..."
 
       # Tier 2: backends (depend on core)
       - name: Publish stellar-zk-groth16
@@ -51,10 +61,39 @@ jobs:
       - name: Publish stellar-zk-risc0
         run: cargo publish -p stellar-zk-risc0 ${{ steps.flags.outputs.flag }}
 
-      - name: Wait for crates.io index
+      - name: Wait for backend crates to be indexed
         if: inputs.dry_run == false
-        run: sleep 30
+        run: |
+          echo "Waiting for backend crates to appear in crates.io index..."
+          for crate in stellar-zk-groth16 stellar-zk-ultrahonk stellar-zk-risc0; do
+            for i in $(seq 1 30); do
+              if cargo search "$crate" 2>/dev/null | grep -q "^$crate "; then
+                echo "$crate is indexed."
+                break
+              fi
+              echo "Attempt $i/30 — $crate not yet indexed, waiting 10s..."
+              sleep 10
+            done
+          done
 
       # Tier 3: CLI (depends on all)
       - name: Publish stellar-zk (CLI)
         run: cargo publish -p stellar-zk ${{ steps.flags.outputs.flag }}
+
+      - name: Summary
+        if: inputs.dry_run == false
+        run: |
+          echo "## Published crates" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [stellar-zk-core](https://crates.io/crates/stellar-zk-core)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [stellar-zk-groth16](https://crates.io/crates/stellar-zk-groth16)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [stellar-zk-ultrahonk](https://crates.io/crates/stellar-zk-ultrahonk)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [stellar-zk-risc0](https://crates.io/crates/stellar-zk-risc0)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- [stellar-zk](https://crates.io/crates/stellar-zk)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary (dry run)
+        if: inputs.dry_run == true
+        run: |
+          echo "## Dry run completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All 5 crates passed validation. Ready to publish." >> "$GITHUB_STEP_SUMMARY"

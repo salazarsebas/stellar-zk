@@ -58,4 +58,19 @@ mod tests {
     fn test_validate_seal_empty() {
         assert!(!validate_seal(&[]));
     }
+
+    #[test]
+    fn test_validate_seal_too_short() {
+        // 1-3 bytes: less than the 4-byte selector
+        assert!(!validate_seal(&[0x31]));
+        assert!(!validate_seal(&[0x31, 0x0f]));
+        assert!(!validate_seal(&[0x31, 0x0f, 0xe5]));
+    }
+
+    #[test]
+    fn test_validate_seal_too_long() {
+        let mut seal = RISC0_SELECTOR.to_vec();
+        seal.extend_from_slice(&[0u8; 300]); // 304 total, expected 260
+        assert!(!validate_seal(&seal));
+    }
 }

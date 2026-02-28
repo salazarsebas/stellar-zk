@@ -24,10 +24,7 @@ pub async fn run(
 ) -> Result<()> {
     output::print_header("stellar-zk call");
 
-    let project_dir = config_path
-        .parent()
-        .unwrap_or(Path::new("."))
-        .to_path_buf();
+    let project_dir = config_path.parent().unwrap_or(Path::new(".")).to_path_buf();
 
     let (project_config, _) = project::load_project(&project_dir)?;
 
@@ -97,10 +94,11 @@ fn load_public_inputs(explicit_path: Option<&Path>, project_dir: &Path) -> Resul
         );
     }
 
-    let pi_json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&pi_json_path)?)?;
-    let hex_array = pi_json["public_inputs_hex"]
-        .as_array()
-        .ok_or_else(|| anyhow::anyhow!("invalid public_inputs.json: missing public_inputs_hex array"))?;
+    let pi_json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&pi_json_path)?)?;
+    let hex_array = pi_json["public_inputs_hex"].as_array().ok_or_else(|| {
+        anyhow::anyhow!("invalid public_inputs.json: missing public_inputs_hex array")
+    })?;
 
     let mut result = Vec::new();
     for hex_val in hex_array {

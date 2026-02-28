@@ -19,3 +19,4 @@ pub mod profile;
 pub mod project;
 pub mod stellar;
 pub mod templates;
+pub mod version;

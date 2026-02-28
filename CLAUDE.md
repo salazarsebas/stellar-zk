@@ -78,7 +78,7 @@ Key patterns:
 
 ## Do NOT
 
-- **Do NOT modify templates** in `templates/` without updating the corresponding constants in `crates/stellar-zk-core/src/templates/embedded.rs` — they are loaded at compile-time via `include_str!`.
+- **Do NOT modify templates** in `crates/stellar-zk-core/templates/` without updating the corresponding constants in `crates/stellar-zk-core/src/templates/embedded.rs` — they are loaded at compile-time via `include_str!`.
 - **Do NOT add heavy dependencies** (e.g., `risc0-zkvm`, `ark-circom`, `wasmer`). The shell-out strategy is intentional.
 - **Do NOT change byte order** in serializers without updating BOTH the Rust serializer AND the corresponding contract template. G2 `c1|c0` ordering is critical.
 - **Do NOT use `ark-circom`** — it depends on `wasmer-wasix` which doesn't compile on Rust 1.84+. Use `snarkjs` via shell instead.
@@ -143,10 +143,10 @@ These groups of files are tightly coupled. When modifying one, check/update the 
 
 | Group | Files | Relationship |
 |-------|-------|-------------|
-| **Templates** | `templates/**/*.tmpl` ↔ `core/src/templates/embedded.rs` | Templates are loaded at compile-time via `include_str!`. Adding/removing a template requires updating the constant in `embedded.rs`. |
-| **Groth16 serialization** | `groth16/src/serializer.rs` ↔ `templates/contracts/groth16_verifier/src/lib.rs.tmpl` | Byte layout must match exactly. G2 `c1\|c0` ordering is critical. |
-| **UltraHonk serialization** | `ultrahonk/src/serializer.rs` ↔ `templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl` | Proof format parsing must match. |
-| **RISC Zero serialization** | `risc0/src/serializer.rs` ↔ `templates/contracts/risc0_verifier/src/lib.rs.tmpl` | Selector + seal layout must match. |
+| **Templates** | `core/templates/**/*.tmpl` ↔ `core/src/templates/embedded.rs` | Templates are loaded at compile-time via `include_str!`. Adding/removing a template requires updating the constant in `embedded.rs`. |
+| **Groth16 serialization** | `groth16/src/serializer.rs` ↔ `core/templates/contracts/groth16_verifier/src/lib.rs.tmpl` | Byte layout must match exactly. G2 `c1\|c0` ordering is critical. |
+| **UltraHonk serialization** | `ultrahonk/src/serializer.rs` ↔ `core/templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl` | Proof format parsing must match. |
+| **RISC Zero serialization** | `risc0/src/serializer.rs` ↔ `core/templates/contracts/risc0_verifier/src/lib.rs.tmpl` | Selector + seal layout must match. |
 | **Backend registration** | `cli/src/main.rs` (BackendChoice) ↔ `cli/src/commands/init.rs` (create_backend) ↔ `core/src/config.rs` (BackendConfig) | Adding a backend requires updating all three. |
 | **Profiles** | `core/src/profile.rs` ↔ `core/src/pipeline.rs` | Pipeline reads profile settings for opt-level, LTO, wasm-opt flags. |
 
@@ -155,8 +155,8 @@ These groups of files are tightly coupled. When modifying one, check/update the 
 ### Add a new backend
 
 1. Create `crates/stellar-zk-<name>/` with `ZkBackend` impl
-2. Add circuit template to `templates/circuits/<name>/`
-3. Add contract template to `templates/contracts/<name>_verifier/`
+2. Add circuit template to `crates/stellar-zk-core/templates/circuits/<name>/`
+3. Add contract template to `crates/stellar-zk-core/templates/contracts/<name>_verifier/`
 4. Register `include_str!` constants in `core/src/templates/embedded.rs`
 5. Add variant to `BackendChoice` in `cli/src/main.rs`
 6. Add factory case in `cli/src/commands/init.rs::create_backend()`
@@ -165,7 +165,7 @@ These groups of files are tightly coupled. When modifying one, check/update the 
 
 ### Modify a template
 
-1. Edit the `.tmpl` file in `templates/`
+1. Edit the `.tmpl` file in `crates/stellar-zk-core/templates/`
 2. Verify the `include_str!` path in `embedded.rs` still matches
 3. Run `cargo build` to confirm the new template compiles into the binary
 4. Test with `cargo run -- init testproj --backend <backend>`

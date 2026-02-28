@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/salazarsebas/stellar-zk/actions/workflows/ci.yml/badge.svg)](https://github.com/salazarsebas/stellar-zk/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/stellar-zk.svg)](https://crates.io/crates/stellar-zk)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
-[![Rust](https://img.shields.io/badge/rust-1.84%2B-orange.svg)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 The easiest way to build, prove, and verify zero-knowledge proofs on the [Stellar](https://stellar.org/) network. stellar-zk orchestrates ZK proof systems for [Soroban](https://soroban.stellar.org/) smart contracts — handling circuit compilation, trusted setup, proof generation, contract deployment, and on-chain verification so you can focus on your ZK application logic.
@@ -102,7 +102,7 @@ brew install stellar-zk
 
 ### crates.io
 
-Requires [Rust](https://rustup.rs/) 1.84.0+:
+Requires [Rust](https://rustup.rs/) 1.85.0+:
 
 ```bash
 cargo install stellar-zk
@@ -283,7 +283,7 @@ Three tiers of estimation:
 
 ### All backends
 
-- [Rust](https://rustup.rs/) 1.84.0+
+- [Rust](https://rustup.rs/) 1.85.0+
 - [Stellar CLI](https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli) (for deploy and call commands)
 
 ### Groth16
@@ -353,24 +353,24 @@ stellar-zk/
 │   │       ├── proof_convert.rs        # Extract public inputs from proof
 │   │       └── serializer.rs           # Proof format utilities
 │   │
-│   └── stellar-zk-risc0/               # RISC Zero backend
-│       └── src/
-│           ├── lib.rs                  # Risc0Backend (ZkBackend impl)
-│           ├── guest.rs                # Build guest ELF + host binary
-│           ├── prover.rs               # Shell out to host binary
-│           └── serializer.rs           # Seal validation (selector + length)
-│
-└── templates/                           # Embedded via include_str!
-    ├── circuits/
-    │   ├── groth16/example.circom       # Starter Circom circuit
-    │   ├── ultrahonk/                   # Nargo.toml + main.nr
-    │   └── risc0/                       # guest/ + host/ (Cargo.toml + main.rs)
-    ├── contracts/
-    │   ├── groth16_verifier/            # Soroban contract (Groth16 pairing check)
-    │   ├── ultrahonk_verifier/          # Soroban contract (KZG pairing check)
-    │   └── risc0_verifier/              # Soroban contract (Groth16 seal verification)
-    └── config/
-        └── input.json.tmpl              # Starter input file
+│   ├── stellar-zk-risc0/               # RISC Zero backend
+│   │   └── src/
+│   │       ├── lib.rs                  # Risc0Backend (ZkBackend impl)
+│   │       ├── guest.rs                # Build guest ELF + host binary
+│   │       ├── prover.rs               # Shell out to host binary
+│   │       └── serializer.rs           # Seal validation (selector + length)
+│   │
+│   └── stellar-zk-core/templates/      # Embedded via include_str!
+│       ├── circuits/
+│       │   ├── groth16/example.circom  # Starter Circom circuit
+│       │   ├── ultrahonk/              # Nargo.toml + main.nr
+│       │   └── risc0/                  # guest/ + host/ (Cargo.toml + main.rs)
+│       ├── contracts/
+│       │   ├── groth16_verifier/       # Soroban contract (Groth16 pairing check)
+│       │   ├── ultrahonk_verifier/     # Soroban contract (KZG pairing check)
+│       │   └── risc0_verifier/         # Soroban contract (Groth16 seal verification)
+│       └── config/
+│           └── input.json.tmpl         # Starter input file
 ```
 
 ### Scaffolded project layout
@@ -651,7 +651,7 @@ The build pipeline compiles and optimizes the Soroban verifier contract:
 
 1. Create a new crate: `crates/stellar-zk-<name>/`
 2. Implement the `ZkBackend` trait
-3. Add circuit and contract templates to `templates/`
+3. Add circuit and contract templates to `crates/stellar-zk-core/templates/`
 4. Register in the CLI factory (`init.rs::create_backend`)
 5. Add to the `BackendChoice` enum in `main.rs`
 6. Add cost model to `estimator.rs`
@@ -777,9 +777,4 @@ stellar-zk shells out to external tools (`circom`, `snarkjs`, `nargo`, `bb`, `ca
 
 ## License
 
-Licensed under either of:
-
-- [MIT License](LICENSE-MIT)
-- [Apache License, Version 2.0](LICENSE-APACHE)
-
-at your option.
+Licensed under the [MIT License](LICENSE).

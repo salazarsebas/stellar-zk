@@ -23,12 +23,10 @@ pub fn compile_circom(circuit_path: &Path, output_dir: &Path) -> Result<()> {
             let stderr = String::from_utf8_lossy(&out.stderr);
             Err(StellarZkError::CircuitCompilation(stderr.to_string()))
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Err(StellarZkError::MissingTool {
-                name: "circom".into(),
-                install: "npm install -g circom".into(),
-            })
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StellarZkError::MissingTool {
+            name: "circom".into(),
+            install: "npm install -g circom".into(),
+        }),
         Err(e) => Err(StellarZkError::CircuitCompilation(e.to_string())),
     }
 }

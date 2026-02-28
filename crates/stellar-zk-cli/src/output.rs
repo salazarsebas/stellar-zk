@@ -27,11 +27,7 @@ pub fn print_error(text: &str) {
 
 /// Print a progress step indicator like `[1/3] Compiling circuit...`.
 pub fn print_step(step: u32, total: u32, text: &str) {
-    println!(
-        "{} {}",
-        style(format!("[{step}/{total}]")).dim(),
-        text
-    );
+    println!("{} {}", style(format!("[{step}/{total}]")).dim(), text);
 }
 
 /// Print a key-value pair with dimmed key formatting.

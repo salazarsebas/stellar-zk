@@ -75,7 +75,7 @@ body:
     attributes:
       label: Rust version
       description: Output of `rustc --version`
-      placeholder: "rustc 1.84.0 (9fc6b4312 2025-01-07)"
+      placeholder: "rustc 1.85.0 (4d91de4e4 2025-02-17)"
 
   - type: textarea
     id: tool-versions

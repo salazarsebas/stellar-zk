@@ -56,3 +56,64 @@ impl Default for TemplateRenderer {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::templates::embedded;
+
+    #[test]
+    fn test_render_simple_template() {
+        let renderer = TemplateRenderer::new();
+        let data = serde_json::json!({ "name": "Alice" });
+        let result = renderer.render("Hello, {{name}}!", &data).unwrap();
+        assert_eq!(result, "Hello, Alice!");
+    }
+
+    #[test]
+    fn test_strict_mode_rejects_missing_variable() {
+        let renderer = TemplateRenderer::new();
+        let data = serde_json::json!({});
+        let result = renderer.render("Hello, {{name}}!", &data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_groth16_contract_template_renders() {
+        let renderer = TemplateRenderer::new();
+        let data = serde_json::json!({
+            "contract_name": "groth16_verifier",
+            "project_name": "test_project",
+        });
+        let result = renderer.render(embedded::GROTH16_CONTRACT_LIB, &data);
+        assert!(
+            result.is_ok(),
+            "groth16 contract template failed: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_ultrahonk_contract_template_renders() {
+        let renderer = TemplateRenderer::new();
+        let data = serde_json::json!({
+            "contract_name": "ultrahonk_verifier",
+            "project_name": "test_project",
+        });
+        let result = renderer.render(embedded::ULTRAHONK_CONTRACT_LIB, &data);
+        assert!(
+            result.is_ok(),
+            "ultrahonk contract template failed: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_risc0_contract_template_renders() {
+        let renderer = TemplateRenderer::new();
+        let data = serde_json::json!({
+            "contract_name": "risc0_verifier",
+            "project_name": "test_project",
+        });
+        let result = renderer.render(embedded::RISC0_CONTRACT_LIB, &data);
+        assert!(result.is_ok(), "risc0 contract template failed: {result:?}");
+    }
+}

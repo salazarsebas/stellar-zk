@@ -33,7 +33,7 @@ The serializers in each backend crate convert proof system outputs to Soroban's 
 
 ### Contract Templates (Critical)
 
-The Soroban verifier contracts in `templates/contracts/` perform on-chain cryptographic verification. Bugs here can allow invalid proofs to pass or valid proofs to fail.
+The Soroban verifier contracts in `crates/stellar-zk-core/templates/contracts/` perform on-chain cryptographic verification. Bugs here can allow invalid proofs to pass or valid proofs to fail.
 
 ### Artifact Chain (High)
 

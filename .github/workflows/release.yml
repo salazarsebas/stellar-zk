@@ -67,8 +67,7 @@ jobs:
           mkdir -p "$staging"
           cp "target/${{ matrix.target }}/release/${{ steps.bin.outputs.name }}" "$staging/"
           cp README.md "$staging/" 2>/dev/null || true
-          cp LICENSE-MIT "$staging/" 2>/dev/null || true
-          cp LICENSE-APACHE "$staging/" 2>/dev/null || true
+          cp LICENSE "$staging/" 2>/dev/null || true
           tar czf "$archive" "$staging"
           echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
 
@@ -82,8 +81,7 @@ jobs:
           mkdir -p "$staging"
           cp "target/${{ matrix.target }}/release/${{ steps.bin.outputs.name }}" "$staging/"
           cp README.md "$staging/" 2>/dev/null || true
-          cp LICENSE-MIT "$staging/" 2>/dev/null || true
-          cp LICENSE-APACHE "$staging/" 2>/dev/null || true
+          cp LICENSE "$staging/" 2>/dev/null || true
           7z a "$archive" "$staging"
           echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
 

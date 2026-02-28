@@ -21,7 +21,7 @@ Each crate should be owned by **one agent at a time**. Never have two agents edi
 | `stellar-zk-groth16` | `lib.rs`, `circuit.rs`, `prover.rs`, `serializer.rs` | Circom + snarkjs orchestration, BN254 serialization |
 | `stellar-zk-ultrahonk` | `lib.rs`, `nargo.rs`, `proof_convert.rs`, `serializer.rs` | Noir + Barretenberg orchestration |
 | `stellar-zk-risc0` | `lib.rs`, `guest.rs`, `prover.rs`, `serializer.rs` | RISC Zero zkVM orchestration, seal validation |
-| `templates/` | `circuits/**`, `contracts/**`, `config/**` | Handlebars templates (`.tmpl` files) |
+| `crates/stellar-zk-core/templates/` | `circuits/**`, `contracts/**`, `config/**` | Handlebars templates (`.tmpl` files) |
 
 ---
 
@@ -30,22 +30,22 @@ Each crate should be owned by **one agent at a time**. Never have two agents edi
 These file groups are tightly coupled. When you modify one file in a group, you **must** check and update the others in the same agent session.
 
 ### 1. Templates <-> Embedded Constants
-- **Files**: `templates/**/*.tmpl` <-> `crates/stellar-zk-core/src/templates/embedded.rs`
+- **Files**: `crates/stellar-zk-core/templates/**/*.tmpl` <-> `crates/stellar-zk-core/src/templates/embedded.rs`
 - **Rule**: Adding, removing, or renaming a `.tmpl` file requires updating the `include_str!` constant in `embedded.rs`
 - **Verify**: `cargo build` (compile-time error if mismatched)
 
 ### 2. Groth16 Serializer <-> Groth16 Contract Template
-- **Files**: `crates/stellar-zk-groth16/src/serializer.rs` <-> `templates/contracts/groth16_verifier/src/lib.rs.tmpl`
+- **Files**: `crates/stellar-zk-groth16/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/groth16_verifier/src/lib.rs.tmpl`
 - **Rule**: Byte layout must match exactly. G2 component order is `c1 | c0` (higher-degree first)
 - **Verify**: `cargo test -p stellar-zk-groth16`
 
 ### 3. UltraHonk Serializer <-> UltraHonk Contract Template
-- **Files**: `crates/stellar-zk-ultrahonk/src/serializer.rs` <-> `templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl`
+- **Files**: `crates/stellar-zk-ultrahonk/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/ultrahonk_verifier/src/lib.rs.tmpl`
 - **Rule**: Proof format parsing in contract must match serializer output
 - **Verify**: `cargo test -p stellar-zk-ultrahonk`
 
 ### 4. RISC Zero Serializer <-> RISC Zero Contract Template
-- **Files**: `crates/stellar-zk-risc0/src/serializer.rs` <-> `templates/contracts/risc0_verifier/src/lib.rs.tmpl`
+- **Files**: `crates/stellar-zk-risc0/src/serializer.rs` <-> `crates/stellar-zk-core/templates/contracts/risc0_verifier/src/lib.rs.tmpl`
 - **Rule**: Selector (4 bytes) + seal layout must match
 - **Verify**: `cargo test -p stellar-zk-risc0`
 
@@ -70,8 +70,8 @@ These file groups are tightly coupled. When you modify one file in a group, you 
 | # | Subtask | Crate | Parallel? |
 |---|---------|-------|-----------|
 | 1 | Create crate with `ZkBackend` impl | `stellar-zk-<name>/` | Yes |
-| 2 | Add circuit template | `templates/circuits/<name>/` | Yes |
-| 3 | Add contract template | `templates/contracts/<name>_verifier/` | Yes |
+| 2 | Add circuit template | `crates/stellar-zk-core/templates/circuits/<name>/` | Yes |
+| 3 | Add contract template | `crates/stellar-zk-core/templates/contracts/<name>_verifier/` | Yes |
 | 4 | Write serializer + tests | `stellar-zk-<name>/serializer.rs` | Yes |
 | 5 | Register `include_str!` constants | `core/src/templates/embedded.rs` | No (after 2, 3) |
 | 6 | Add `BackendChoice` variant | `cli/src/main.rs` | No (after 1) |
@@ -85,7 +85,7 @@ These file groups are tightly coupled. When you modify one file in a group, you 
 3 subtasks, strictly sequential.
 
 1. **Identify**: Read the serializer and contract template side-by-side, find the mismatch
-2. **Fix both sides**: Update `<backend>/src/serializer.rs` AND `templates/contracts/<backend>_verifier/src/lib.rs.tmpl`
+2. **Fix both sides**: Update `<backend>/src/serializer.rs` AND `crates/stellar-zk-core/templates/contracts/<backend>_verifier/src/lib.rs.tmpl`
 3. **Test**: Run `cargo test -p stellar-zk-<backend>` and verify proof layout
 
 **Single-agent rule**: Serializer + template must be fixed by the same agent.
@@ -104,7 +104,7 @@ These file groups are tightly coupled. When you modify one file in a group, you 
 
 4 subtasks, sequential.
 
-1. Edit the `.tmpl` file in `templates/`
+1. Edit the `.tmpl` file in `crates/stellar-zk-core/templates/`
 2. Verify `include_str!` path in `core/src/templates/embedded.rs` still matches
 3. Run `cargo build` to confirm compile-time embedding works
 4. Test with `cargo run -- init testproj --backend <backend>`
@@ -183,20 +183,20 @@ These combinations are safe to run in parallel:
 
 - Agent A on `stellar-zk-groth16` + Agent B on `stellar-zk-ultrahonk` (independent backends)
 - Agent A on `stellar-zk-cli/commands/deploy.rs` + Agent B on `stellar-zk-risc0` (different crates)
-- Agent A on `templates/circuits/` + Agent B on `core/src/estimator.rs` (no coupling)
+- Agent A on `crates/stellar-zk-core/templates/circuits/` + Agent B on `core/src/estimator.rs` (no coupling)
 
 ### Unsafe parallelism (avoid)
 
 - Two agents both editing `core/src/config.rs`
-- Agent A on `groth16/serializer.rs` + Agent B on `templates/contracts/groth16_verifier/`
-- Agent A on `templates/` + Agent B on `core/src/templates/embedded.rs`
+- Agent A on `groth16/serializer.rs` + Agent B on `crates/stellar-zk-core/templates/contracts/groth16_verifier/`
+- Agent A on `crates/stellar-zk-core/templates/` + Agent B on `core/src/templates/embedded.rs`
 
 ---
 
 ## Safety Rules
 
 1. **No heavy dependencies** — Never add `risc0-zkvm`, `ark-circom`, `wasmer`, or similar. Backends shell out to external tools via `Command::new()`
-2. **No byte-order changes without dual update** — If you change serialization in `<backend>/serializer.rs`, you must update the contract template in `templates/contracts/<backend>_verifier/` to match. G2 point ordering (`c1 | c0`) is critical
+2. **No byte-order changes without dual update** — If you change serialization in `<backend>/serializer.rs`, you must update the contract template in `crates/stellar-zk-core/templates/contracts/<backend>_verifier/` to match. G2 point ordering (`c1 | c0`) is critical
 3. **No breaking the artifact chain** — `target/build_artifacts.json` is produced by `build` and consumed by `prove`, `deploy`, `call`, and `estimate`. Do not change its schema without updating all consumers
 4. **No removing overflow_checks** — ZK verification is security-critical. Cargo profiles must keep `overflow-checks = true`
 5. **No `ark-circom`** — Depends on `wasmer-wasix` which doesn't compile on Rust 1.84+. Use `snarkjs` via shell
@@ -223,6 +223,6 @@ These combinations are safe to run in parallel:
 | Groth16 serializer | `crates/stellar-zk-groth16/src/serializer.rs` |
 | UltraHonk serializer | `crates/stellar-zk-ultrahonk/src/serializer.rs` |
 | RISC Zero serializer | `crates/stellar-zk-risc0/src/serializer.rs` |
-| Circuit templates | `templates/circuits/` |
-| Contract templates | `templates/contracts/` |
-| Config templates | `templates/config/` |
+| Circuit templates | `crates/stellar-zk-core/templates/circuits/` |
+| Contract templates | `crates/stellar-zk-core/templates/contracts/` |
+| Config templates | `crates/stellar-zk-core/templates/config/` |

@@ -57,7 +57,11 @@ pub fn create_project_dirs(project_dir: &Path, backend: &str) -> Result<()> {
 }
 
 /// Write the config files to the project directory.
-pub fn write_configs(project_dir: &Path, project: &ProjectConfig, backend: &BackendConfig) -> Result<()> {
+pub fn write_configs(
+    project_dir: &Path,
+    project: &ProjectConfig,
+    backend: &BackendConfig,
+) -> Result<()> {
     project.save(&project_dir.join("stellar-zk.config.json"))?;
     backend.save(&project_dir.join("backend.config.json"))?;
     Ok(())

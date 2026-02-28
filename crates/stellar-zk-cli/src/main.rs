@@ -234,13 +234,7 @@ async fn main() -> anyhow::Result<()> {
             public_inputs,
             network,
         } => {
-            commands::estimate::run(
-                &cli.config,
-                proof.as_deref(),
-                public_inputs,
-                &network,
-            )
-            .await?;
+            commands::estimate::run(&cli.config, proof.as_deref(), public_inputs, &network).await?;
         }
     }
 

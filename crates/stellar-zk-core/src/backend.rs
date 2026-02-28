@@ -57,6 +57,14 @@ pub struct PrerequisiteError {
     pub install_instructions: String,
 }
 
+/// Warning about a tool version being below the recommended minimum.
+#[derive(Debug, Clone)]
+pub struct VersionWarning {
+    pub tool_name: String,
+    pub found_version: String,
+    pub minimum_version: String,
+}
+
 /// Every ZK backend must implement this trait.
 #[async_trait]
 pub trait ZkBackend: Send + Sync {
@@ -69,13 +77,18 @@ pub trait ZkBackend: Send + Sync {
     /// Check that all required external tools are installed.
     fn check_prerequisites(&self) -> std::result::Result<(), Vec<PrerequisiteError>>;
 
+    /// Check installed tool versions against recommended minimums.
+    ///
+    /// Returns warnings for tools whose versions are below the minimum.
+    /// If version detection fails (tool doesn't support `--version`, unexpected output),
+    /// the tool is silently skipped — no warning emitted.
+    fn check_versions(&self) -> Vec<VersionWarning> {
+        vec![]
+    }
+
     /// Initialize a new project: scaffold circuit/program files and
     /// the verifier contract template into the project directory.
-    async fn init_project(
-        &self,
-        project_dir: &Path,
-        config: &ProjectConfig,
-    ) -> Result<()>;
+    async fn init_project(&self, project_dir: &Path, config: &ProjectConfig) -> Result<()>;
 
     /// Compile the circuit/program and generate the verifier contract WASM.
     async fn build(
