@@ -15,7 +15,9 @@ pub fn extract_public_inputs(proof_bytes: &[u8]) -> Vec<[u8; 32]> {
         proof_bytes[3],
     ]) as usize;
 
-    let mut inputs = Vec::with_capacity(count);
+    // Cap capacity to what the buffer can actually hold to avoid OOM on malformed input
+    let max_possible = (proof_bytes.len().saturating_sub(4)) / 32;
+    let mut inputs = Vec::with_capacity(count.min(max_possible));
     for i in 0..count {
         let offset = 4 + i * 32;
         if offset + 32 > proof_bytes.len() {
