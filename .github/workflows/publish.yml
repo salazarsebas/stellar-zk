@@ -7,115 +7,345 @@ on:
         description: "Dry run (validate only, do not publish)"
         type: boolean
         default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Dry run (validate only, do not publish)"
+        type: boolean
+        default: false
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
-  publish:
-    name: Publish crates
+  # ── Job 1: Extract version from Cargo.toml ──────────────────────────
+  get-version:
+    name: Get version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Extract workspace version
+        id: version
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Workspace version: $version"
 
+      - name: Validate tag matches version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="${{ steps.version.outputs.version }}"
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "::error::Tag version ($tag_version) does not match Cargo.toml version ($cargo_version)"
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches Cargo.toml version $cargo_version"
+
+  # ── Job 2: Tier 1 — stellar-zk-core (no internal deps) ─────────────
+  publish-core:
+    name: "Publish stellar-zk-core"
+    needs: get-version
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.result }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Set publish flag
-        id: flags
+      - name: Check if already published
+        id: check
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "flag=--dry-run" >> "$GITHUB_OUTPUT"
+          version="${{ needs.get-version.outputs.version }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://crates.io/api/v1/crates/stellar-zk-core/$version")
+          if [ "$status" = "200" ]; then
+            echo "stellar-zk-core@$version already published"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "stellar-zk-core@$version not found (HTTP $status)"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Dry run: validate packaging
-      - name: Validate stellar-zk-core (dry run)
-        if: inputs.dry_run == true
-        run: cargo publish -p stellar-zk-core --dry-run
-
-      - name: Validate dependent crates metadata (dry run)
-        if: inputs.dry_run == true
+      - name: Publish
+        id: publish
         run: |
-          # Dependent crates can't do full dry-run until core is on crates.io.
-          # Validate file lists and metadata instead. Build/test is covered by CI.
-          for crate in stellar-zk-groth16 stellar-zk-ultrahonk stellar-zk-risc0 stellar-zk; do
-            echo "--- $crate ---"
-            cargo package -p "$crate" --list
-            echo ""
-          done
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: validating stellar-zk-core..."
+            cargo publish -p stellar-zk-core --dry-run
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "Skipping: already published"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          else
+            cargo publish -p stellar-zk-core
+            echo "result=published" >> "$GITHUB_OUTPUT"
+          fi
 
-      # Real publish: tiered to respect dependency order
-      # Tier 1: core (no internal deps)
-      - name: Publish stellar-zk-core
-        if: inputs.dry_run == false
-        run: cargo publish -p stellar-zk-core
-
-      - name: Wait for stellar-zk-core to be indexed
-        if: inputs.dry_run == false
+      - name: Wait for crates.io index
+        if: steps.publish.outputs.result == 'published'
         run: |
-          echo "Waiting for stellar-zk-core to appear in crates.io index..."
-          for i in $(seq 1 30); do
-            if cargo search stellar-zk-core 2>/dev/null | grep -q "^stellar-zk-core "; then
-              echo "stellar-zk-core is indexed."
+          version="${{ needs.get-version.outputs.version }}"
+          echo "Waiting for stellar-zk-core@$version to be indexed..."
+          for i in $(seq 1 6); do
+            sleep 5
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://crates.io/api/v1/crates/stellar-zk-core/$version")
+            if [ "$status" = "200" ]; then
+              echo "Indexed after $((i * 5))s"
               exit 0
             fi
-            echo "Attempt $i/30 — not yet indexed, waiting 10s..."
-            sleep 10
+            echo "Attempt $i/6 — not yet indexed (HTTP $status)"
           done
-          echo "Timed out waiting for index. Proceeding anyway..."
+          echo "::warning::Timed out waiting for index after 30s. Proceeding anyway."
 
-      # Tier 2: backends (depend on core)
-      - name: Publish stellar-zk-groth16
-        if: inputs.dry_run == false
-        run: cargo publish -p stellar-zk-groth16
+  # ── Job 3a: Tier 2 — stellar-zk-groth16 ────────────────────────────
+  publish-groth16:
+    name: "Publish stellar-zk-groth16"
+    needs: [get-version, publish-core]
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.result }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Publish stellar-zk-ultrahonk
-        if: inputs.dry_run == false
-        run: cargo publish -p stellar-zk-ultrahonk
-
-      - name: Publish stellar-zk-risc0
-        if: inputs.dry_run == false
-        run: cargo publish -p stellar-zk-risc0
-
-      - name: Wait for backend crates to be indexed
-        if: inputs.dry_run == false
+      - name: Check if already published
+        id: check
         run: |
-          echo "Waiting for backend crates to appear in crates.io index..."
-          for crate in stellar-zk-groth16 stellar-zk-ultrahonk stellar-zk-risc0; do
-            for i in $(seq 1 30); do
-              if cargo search "$crate" 2>/dev/null | grep -q "^$crate "; then
-                echo "$crate is indexed."
-                break
-              fi
-              echo "Attempt $i/30 — $crate not yet indexed, waiting 10s..."
-              sleep 10
-            done
+          version="${{ needs.get-version.outputs.version }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://crates.io/api/v1/crates/stellar-zk-groth16/$version")
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        id: publish
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: validating stellar-zk-groth16..."
+            cargo package -p stellar-zk-groth16 --list
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "Skipping: already published"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          else
+            cargo publish -p stellar-zk-groth16
+            echo "result=published" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for crates.io index
+        if: steps.publish.outputs.result == 'published'
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          for i in $(seq 1 6); do
+            sleep 5
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://crates.io/api/v1/crates/stellar-zk-groth16/$version")
+            if [ "$status" = "200" ]; then
+              echo "Indexed after $((i * 5))s"
+              exit 0
+            fi
+            echo "Attempt $i/6 — not yet indexed (HTTP $status)"
           done
+          echo "::warning::Timed out waiting for index after 30s."
 
-      # Tier 3: CLI (depends on all)
-      - name: Publish stellar-zk (CLI)
-        if: inputs.dry_run == false
-        run: cargo publish -p stellar-zk
+  # ── Job 3b: Tier 2 — stellar-zk-ultrahonk ──────────────────────────
+  publish-ultrahonk:
+    name: "Publish stellar-zk-ultrahonk"
+    needs: [get-version, publish-core]
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.result }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Summary
-        if: inputs.dry_run == false
+      - name: Check if already published
+        id: check
         run: |
-          echo "## Published crates" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- [stellar-zk-core](https://crates.io/crates/stellar-zk-core)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- [stellar-zk-groth16](https://crates.io/crates/stellar-zk-groth16)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- [stellar-zk-ultrahonk](https://crates.io/crates/stellar-zk-ultrahonk)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- [stellar-zk-risc0](https://crates.io/crates/stellar-zk-risc0)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- [stellar-zk](https://crates.io/crates/stellar-zk)" >> "$GITHUB_STEP_SUMMARY"
+          version="${{ needs.get-version.outputs.version }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://crates.io/api/v1/crates/stellar-zk-ultrahonk/$version")
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Summary (dry run)
-        if: inputs.dry_run == true
+      - name: Publish
+        id: publish
         run: |
-          echo "## Dry run completed" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "All 5 crates passed validation. Ready to publish." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: validating stellar-zk-ultrahonk..."
+            cargo package -p stellar-zk-ultrahonk --list
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "Skipping: already published"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          else
+            cargo publish -p stellar-zk-ultrahonk
+            echo "result=published" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for crates.io index
+        if: steps.publish.outputs.result == 'published'
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          for i in $(seq 1 6); do
+            sleep 5
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://crates.io/api/v1/crates/stellar-zk-ultrahonk/$version")
+            if [ "$status" = "200" ]; then
+              echo "Indexed after $((i * 5))s"
+              exit 0
+            fi
+            echo "Attempt $i/6 — not yet indexed (HTTP $status)"
+          done
+          echo "::warning::Timed out waiting for index after 30s."
+
+  # ── Job 3c: Tier 2 — stellar-zk-risc0 ──────────────────────────────
+  publish-risc0:
+    name: "Publish stellar-zk-risc0"
+    needs: [get-version, publish-core]
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.result }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check if already published
+        id: check
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://crates.io/api/v1/crates/stellar-zk-risc0/$version")
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        id: publish
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: validating stellar-zk-risc0..."
+            cargo package -p stellar-zk-risc0 --list
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "Skipping: already published"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          else
+            cargo publish -p stellar-zk-risc0
+            echo "result=published" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for crates.io index
+        if: steps.publish.outputs.result == 'published'
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          for i in $(seq 1 6); do
+            sleep 5
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://crates.io/api/v1/crates/stellar-zk-risc0/$version")
+            if [ "$status" = "200" ]; then
+              echo "Indexed after $((i * 5))s"
+              exit 0
+            fi
+            echo "Attempt $i/6 — not yet indexed (HTTP $status)"
+          done
+          echo "::warning::Timed out waiting for index after 30s."
+
+  # ── Job 4: Tier 3 — stellar-zk CLI (depends on all) ────────────────
+  publish-cli:
+    name: "Publish stellar-zk"
+    needs: [get-version, publish-groth16, publish-ultrahonk, publish-risc0]
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.result }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check if already published
+        id: check
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://crates.io/api/v1/crates/stellar-zk/$version")
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        id: publish
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: validating stellar-zk..."
+            cargo package -p stellar-zk --list
+            echo "result=dry-run" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check.outputs.exists }}" = "true" ]; then
+            echo "Skipping: already published"
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+          else
+            cargo publish -p stellar-zk
+            echo "result=published" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Job 5: Summary ─────────────────────────────────────────────────
+  summary:
+    name: Summary
+    needs: [get-version, publish-core, publish-groth16, publish-ultrahonk, publish-risc0, publish-cli]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          version="${{ needs.get-version.outputs.version }}"
+          dry_run="${{ inputs.dry_run }}"
+
+          if [ "$dry_run" = "true" ]; then
+            title="Dry Run Results"
+          else
+            title="Publish Results"
+          fi
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## $title (v$version)
+
+          | Crate | Result |
+          |-------|--------|
+          | stellar-zk-core | ${{ needs.publish-core.outputs.published }} |
+          | stellar-zk-groth16 | ${{ needs.publish-groth16.outputs.published }} |
+          | stellar-zk-ultrahonk | ${{ needs.publish-ultrahonk.outputs.published }} |
+          | stellar-zk-risc0 | ${{ needs.publish-risc0.outputs.published }} |
+          | stellar-zk | ${{ needs.publish-cli.outputs.published }} |
+          EOF
