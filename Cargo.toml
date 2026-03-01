@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT"
 rust-version = "1.85.0"
@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 
 # Internal crates
-stellar-zk-core = { path = "crates/stellar-zk-core", version = "0.1.1" }
-stellar-zk-groth16 = { path = "crates/stellar-zk-groth16", version = "0.1.1" }
-stellar-zk-ultrahonk = { path = "crates/stellar-zk-ultrahonk", version = "0.1.1" }
-stellar-zk-risc0 = { path = "crates/stellar-zk-risc0", version = "0.1.1" }
+stellar-zk-core = { path = "crates/stellar-zk-core", version = "0.1.2" }
+stellar-zk-groth16 = { path = "crates/stellar-zk-groth16", version = "0.1.2" }
+stellar-zk-ultrahonk = { path = "crates/stellar-zk-ultrahonk", version = "0.1.2" }
+stellar-zk-risc0 = { path = "crates/stellar-zk-risc0", version = "0.1.2" }
