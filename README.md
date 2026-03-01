@@ -30,6 +30,7 @@ Built for Stellar Protocol 25, which introduced native BN254 host functions (`g1
 - [Configuration](#configuration)
 - [Cost Estimation](#cost-estimation)
 - [Security Model](#security-model)
+- [Documentation](#documentation)
 - [License](#license)
 
 ---
@@ -772,6 +773,16 @@ Runs `stellar contract invoke --sim-only` against the deployed contract to get r
 ### External tool security
 
 stellar-zk shells out to external tools (`circom`, `snarkjs`, `nargo`, `bb`, `cargo-risczero`). The security of generated proofs depends on the correctness of these tools. Always use official releases from their respective repositories.
+
+---
+
+## Documentation
+
+- **[Tutorial](docs/tutorial.md)** — Step-by-step guide to your first ZK proof on Stellar. Covers project creation, building, proving, deploying, and verifying on-chain.
+- **[USAGE.md](USAGE.md)** — Complete CLI reference with detailed examples for every command and workflow.
+- **[Troubleshooting & FAQ](docs/troubleshooting.md)** — Solutions for common errors, installation issues, and frequently asked questions.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Development setup and contribution guidelines.
+- **[ROADMAP.md](ROADMAP.md)** — Planned features and milestones.
 
 ---
 

@@ -5,7 +5,20 @@ All notable changes to stellar-zk will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+## [0.1.1] - 2026-02-28
+
+### Added
+
+- **Tutorial**: step-by-step guide covering the full workflow from project creation to on-chain verification (`docs/tutorial.md`)
+- **Troubleshooting & FAQ**: solutions for common errors across all backends, installation issues, and frequently asked questions (`docs/troubleshooting.md`)
+- **docs.rs metadata**: configured `[package.metadata.docs.rs]` for all 4 library crates so documentation renders correctly on docs.rs
+
+### Changed
+
+- **README.md**: added Documentation section with links to tutorial, troubleshooting, and other guides
+- **USAGE.md**: added cross-references to tutorial and troubleshooting in Next Steps section
+
+## [0.1.0] - 2026-02-28
 
 ### Added
 

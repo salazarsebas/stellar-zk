@@ -536,6 +536,8 @@ Common causes:
 
 ## Next Steps
 
+- [Tutorial](docs/tutorial.md) — step-by-step guide to your first ZK proof on Stellar (start here if you're new)
+- [Troubleshooting & FAQ](docs/troubleshooting.md) — solutions for common errors and frequently asked questions
 - [README.md](README.md) — full architecture overview, security model, and backend details
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development setup and contribution guidelines
 - [ROADMAP.md](ROADMAP.md) — planned features and milestones
