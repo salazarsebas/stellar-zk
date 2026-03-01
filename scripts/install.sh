@@ -77,6 +77,10 @@ verify_checksum() {
 
 # --- main ---
 
+TMPDIR_CLEANUP=""
+cleanup() { [ -n "$TMPDIR_CLEANUP" ] && rm -rf "$TMPDIR_CLEANUP"; }
+trap cleanup EXIT
+
 main() {
   need_cmd curl
   need_cmd tar
@@ -95,7 +99,7 @@ main() {
 
   local tmpdir
   tmpdir=$(mktemp -d)
-  trap 'rm -rf "$tmpdir"' EXIT
+  TMPDIR_CLEANUP="$tmpdir"
 
   info "downloading ${archive}..."
   curl -fsSL "$url" -o "${tmpdir}/${archive}" || error "download failed — check that version ${version} exists and has a release for ${target}"
