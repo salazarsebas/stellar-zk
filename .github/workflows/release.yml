@@ -154,7 +154,7 @@ jobs:
           API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         with:
           source_file: stellar-zk-updated.rb
-          destination_repo: salazarsebas/homebrew-tap
+          destination_repo: salazarsebas/homebrew-stellar-zk
           destination_folder: Formula
           destination_branch: main
           rename: stellar-zk.rb
